@@ -1,0 +1,75 @@
+img.shareImg(src="/img/timeline_logo2.png")
+#signin
+  p
+    | See the who, when, and where of your connections over
+    | the entire span of your career so far.
+  script(type="IN/Login", data-size="large")
+#body
+  div#logo
+    img(src="/img/timeline_logo2.png")
+    .clear
+  #message
+  #timelineStuff
+    #upper
+      script(type="IN/Share")
+      #header
+        p
+          | Follow your career timeline and track the
+          | connections you've made throughout the years!
+        p
+          | To start, press "Play" or drag your portrait!
+        div.speedControls
+          a#playBtn.btn(href='#') Play
+          ul#speed
+            li.med.active
+              a(href="#") Medium
+              span.arrow
+            li.slow.speedBtn
+              a(href="#") Slow
+            li.med.hide.speedBtn
+              a(href="#") Medium
+            li.fast.speedBtn
+              a(href="#") Fast
+            li.realfast.speedBtn
+              a(href="#") Really Fast
+      .pics
+    #timeline
+      .top.info
+      .top.date
+      .top.block
+      .bottom.block
+      .bottom.date
+      .bottom.info
+      img#mypic
+    #lower
+      .pics
+    //- #zoomSelect
+  #loading
+    p
+      | Loading LinkedIn framework...
+    img.spinner(src="/img/timeline_loader.gif")
+    .helpReload
+      p.suggestReload
+        | It shouldn't be taking this long...
+        a(href="#")
+          = 'Try again'
+        |  in a few minutes.
+      p.ieWarn
+        | It looks like you're using Internet Explorer. You may have better luck using a modern browser such as
+        a(href="http://www.getfirefox.com")
+          = 'Firefox'
+        |  or
+        a(href="http://www.google.com/chrome/")
+          = 'Chrome'
+        | .
+script(src='/js/jquery/js/jquery-1.5.1.min.js')
+script(src='/socket.io/socket.io.js')
+script(src='/js/litimeline.js')
+script(src='http://platform.linkedin.com/in.js')
+  api_key: y8JAzL_jJwPMkPPpN3CACsxArbVnDw73JGH4K0FYKVgqlTq78qh15fKJ-II9Eb5E
+  authorize: true
+  onLoad: onLinkedInLoad
+script(src='/js/jquery/js/jquery.ui.core.js')
+script(src='/js/jquery/js/jquery.ui.widget.js')
+script(src='/js/jquery/js/jquery.ui.mouse.js')
+script(src='/js/jquery/js/jquery.ui.draggable.js')
