@@ -18,6 +18,13 @@ output = function(str) {
   $('#output').append($('<p>').text(str));
 };
 
+if (typeof Raphael !== 'undefined' && Raphael && Raphael.el) {
+  Raphael.el.fill = function(color) {
+    this.attr({ 'fill': color });
+    return this;
+  };
+}
+
 if (Array && Array.prototype && typeof Array.prototype.forEach === 'undefined') {
   Array.prototype.forEach = function(fn) {
     var i, len;

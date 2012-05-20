@@ -2,7 +2,6 @@ var express = require('express'),
     sys = require('sys'),
     fs = require('fs'),
     app = express.createServer(),
-    logStream = fs.createWriteStream('./request.log', { flags: 'a' }),
     stupidLoadStatuses = ['Plugging in computer...',
                           'Untangling cords...',
                           'Oiling gears...',
@@ -19,7 +18,6 @@ app.configure(function(){
   app.use(express.bodyParser());
   app.use(express.methodOverride());
   app.use(express.static(__dirname + '/public'));
-  app.use(express.logger({ stream: logStream }));
   app.use(app.router); // IMPORTANT! keep this line last.
 });
 
