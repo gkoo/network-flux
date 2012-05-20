@@ -1,14 +1,17 @@
 var PAPER_WIDTH  = 950,
     PAPER_HEIGHT = 500,
+    KNOB_RADIUS     = 20,
+    BAR_WIDTH       = 950 - KNOB_RADIUS*3,
+    BAR_THICKNESS   = 10,
+    BAR_CENTER_Y    = 445,
+    BAR_LEFT_BOUND  = KNOB_RADIUS * 3/2,
+    BAR_RIGHT_BOUND = KNOB_RADIUS*3/2 + BAR_WIDTH,
+    GraphSliderBar,
+    CompanyCircle,
+    NetworkGraph;
 
 GraphSliderBar = function(paper) {
   var isDragging      = false,
-      KNOB_RADIUS     = 20,
-      BAR_WIDTH       = 950 - KNOB_RADIUS*3,
-      BAR_THICKNESS   = 10,
-      BAR_CENTER_Y    = 445,
-      BAR_LEFT_BOUND  = KNOB_RADIUS * 3/2,
-      BAR_RIGHT_BOUND = KNOB_RADIUS*3/2 + BAR_WIDTH,
       mouseDownX, newMouseX, bar, knob, debugStr,
 
   handleKnobDrag = function(dx) {
@@ -52,30 +55,42 @@ GraphSliderBar = function(paper) {
   };
 
   init();
-},
+};
 
-CompanyCircle = function(cmpy, paper) {
-  var calculateCmpyRadius = function(cmpySize) {
+CompanyCircle = function(cmpy, cmpyName, paper) {
+  this.init(cmpy, cmpyName, paper);
+};
+
+CompanyCircle.prototype = {
+  calculateCmpyRadius: function(cmpySize) {
     // Formula: y = -1000/(x+10) + 100
     var radius = 100 - (1000/(cmpySize+10))
     return Math.max(radius, 10);
-  };
+  },
 
-  this.remove = function() {
+  remove: function() {
     this.el.remove();
-  };
+    this.label.remove();
+  },
 
-  this.init = function(cmpy, paper) {
-    radius   = calculateCmpyRadius(cmpy.length);
+  init: function(cmpy, cmpyName, paper) {
+    radius   = this.calculateCmpyRadius(cmpy.length);
     x        = Math.floor(Math.random()*PAPER_WIDTH);
-    y        = Math.floor(Math.random()*PAPER_HEIGHT);
-    this.el  = paper.circle(x,        // center x
-                               y,        // center y
-                               radius); // radius
-  };
+    y        = Math.floor(Math.random()*(BAR_CENTER_Y - (BAR_THICKNESS/2)));
+    this.el  = paper.circle(x,       // center x
+                            y,       // center y
+                            radius) // radius
+                    .attr({ 'fill': '#fff' });
+    this.label = paper.text(x, y, cmpyName)
+                      .attr({ 'fill': '#000' })
+                      //.hide();
 
-  this.init(cmpy, paper);
-},
+    //this.el.hover(this.label.show,
+                  //this.label.hide,
+                  //this.label,
+                  //this.label);
+  }
+};
 
 NetworkGraph = function() {
   this.init = function() {
@@ -95,7 +110,7 @@ NetworkGraph = function() {
 
     $('#output').text("Num companies: " + Object.keys(companies).length);
     for (cmpyId in companies) {
-      cmpy = new CompanyCircle(companies[cmpyId], this.paper);
+      cmpy = new CompanyCircle(companies[cmpyId], cmpyNames[cmpyId], this.paper);
       this.companyEls.push(cmpy);
     }
   }).bind(this);
