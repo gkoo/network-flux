@@ -1,0 +1,27 @@
+/* RESET STUFF */
+html, body, div, p, ul, ol, li {
+  font: 13px Tahoma, Arial;
+  margin: 0;
+  padding: 0;
+}
+ul {
+  list-style: none;
+}
+h1 {
+  background: url(/img/info.png) no-repeat;
+  font-size: 18px;
+  font-weight: normal;
+  padding: 5px 0 0 40px;
+  min-height: 33px;
+}
+hr {
+  margin: 20px 0;
+}
+#main {
+  margin: 50px;
+  width: 500px;
+}
+.messages {
+  list-style: disc outside;
+  padding: 20px;
+}
