@@ -17,6 +17,7 @@ $(function() {
       profileObjs,
       earliestDate,
       timespan,
+      snapshotWorker = new Worker('/js/snapshotWorker.js'),
 
   /**
    * getSnapshot
@@ -24,22 +25,8 @@ $(function() {
    * Render the network graph at a point in time based on the given percentage.
    */
   getSnapshot = function(percent) {
-    var targetDate = earliestDate + (timespan * percent/100),
-        date = new Date();
-
+    var targetDate = earliestDate + (timespan * percent/100);
     currCompanies = {};
-    snapshotWorker = new Worker('/js/snapshotWorker.js');
-
-    snapshotWorker.addEventListener('message', function(evt) {
-      currCompanies = evt.data ? evt.data.currCompanies : null;
-      if (currCompanies) {
-        //filterConnectionsResult(evt.data.coworkers);
-        graph.renderCompanies(currCompanies, cmpyNames);
-        // no-op takes around 70-100 ms
-        console.log('Processing took ' + ((new Date()).getTime() - date.getTime()) + ' milliseconds');
-      }
-    }, false);
-
     snapshotWorker.postMessage({ allCmpyEmployees: allCmpyEmployees,
                                  targetDate:       targetDate });
   }
@@ -111,6 +98,17 @@ $(function() {
   onLinkedInLoad = function() {
     IN.Event.on(IN, "auth", onLinkedInAuth);
   };
+
+  snapshotWorker.addEventListener('message', function(evt) {
+    var date = new Date();
+    currCompanies = evt.data ? evt.data.currCompanies : null;
+    if (currCompanies) {
+      //filterConnectionsResult(evt.data.coworkers);
+      graph.renderCompanies(currCompanies, cmpyNames);
+      // no-op takes around 70-100 ms
+      console.log('Processing took ' + ((new Date()).getTime() - date.getTime()) + ' milliseconds');
+    }
+  }, false);
 
   eve.on('slider', getSnapshot);
 
