@@ -4,19 +4,21 @@
  * Takes result from LinkedIn API and returns data values if there are any to
  * return.
  */
-var getData = function(data) {
+var getData, output;
+
+getData = function(data) {
   if (data && data.values && data.values.length) {
     return data.values;
   }
   return null;
-},
+};
 
 // debug
 output = function(str) {
   $('#output').append($('<p>').text(str));
 };
 
-if (typeof Array.forEach === 'undefined') {
+if (Array && Array.prototype && typeof Array.prototype.forEach === 'undefined') {
   Array.prototype.forEach = function(fn) {
     var i, len;
     for (i = 0, len < this.length; i < len; ++i) {
@@ -25,7 +27,7 @@ if (typeof Array.forEach === 'undefined') {
   }
 }
 
-if (typeof Object.keys === 'undefined') {
+if (Object && typeof Object.keys === 'undefined') {
   Object.keys = function(o) {
     var i = 0;
     for (key in o) {
@@ -38,7 +40,7 @@ if (typeof Object.keys === 'undefined') {
 
 // Thanks, MDN!
 // https://developer.mozilla.org/en/JavaScript/Reference/Global_Objects/Function/bind#Compatibility
-if (!Function.prototype.bind) {
+if (Function && Function.prototype && !Function.prototype.bind) {
   Function.prototype.bind = function (oThis) {
     if (typeof this !== "function") {
       // closest thing possible to the ECMAScript 5 internal IsCallable function

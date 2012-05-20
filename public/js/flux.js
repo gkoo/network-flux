@@ -84,6 +84,7 @@ $(function() {
 
   onLinkedInAuth = function() {
     var fields = ["id", "first-name", "last-name","positions:(start-date,end-date,company:(id,name))","picture-url","educations:(school-name,start-date,end-date)","site-standard-profile-request:(url)"];
+    $('#canvas-container').show();
     if (DO_PROCESSING) {
       // get own profile
       IN.API.Profile('me')
