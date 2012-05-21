@@ -2,20 +2,32 @@
 var NetworkGraph;
 
 (function() {
-  var PAPER_WIDTH     = 950,
-      PAPER_HEIGHT    = 600,
-      KNOB_RADIUS     = 20,
-      BAR_WIDTH       = PAPER_WIDTH - KNOB_RADIUS*3,
-      BAR_THICKNESS   = 10,
-      BAR_CENTER_Y    = PAPER_HEIGHT-55,
-      BAR_TOP_Y       = BAR_CENTER_Y - (BAR_THICKNESS/2),
-      BAR_LEFT_BOUND  = KNOB_RADIUS * 3/2,
-      BAR_RIGHT_BOUND = KNOB_RADIUS*3/2 + BAR_WIDTH,
-      cmpyCircles     = {},
-      currCircles     = [],
-      isDragging      = false,
+  var PAPER_WIDTH      = 950,
+      PAPER_HEIGHT     = 600,
+
+      KNOB_RADIUS      = 20,
+
+      // Coords for the playbar.
+      BAR_WIDTH        = PAPER_WIDTH - KNOB_RADIUS*3,
+      BAR_THICKNESS    = 10,
+      BAR_CENTER_Y     = PAPER_HEIGHT-55,
+      BAR_TOP_Y        = BAR_CENTER_Y - (BAR_THICKNESS/2),
+      BAR_LEFT_BOUND   = KNOB_RADIUS * 3/2,
+      BAR_RIGHT_BOUND  = KNOB_RADIUS*3/2 + BAR_WIDTH,
+
+      // Bounding box for canvas viewport (where the circles are allowed to go)
+      VIEWPORT_PADDING = 10,
+      VIEWPORT_TOP     = VIEWPORT_PADDING,
+      VIEWPORT_LEFT    = VIEWPORT_PADDING,
+      VIEWPORT_RIGHT   = PAPER_WIDTH - VIEWPORT_PADDING,
+      VIEWPORT_BOTTOM  = BAR_TOP_Y - VIEWPORT_PADDING,
+
+      cmpyCircles      = {}, // all circles created up to this point
+      currCircles      = [], // the circles currently drawn in the viewport
+      isDragging       = false,
       GraphSliderBar,
-      CompanyCircle;
+      CompanyCircle,
+      GraphUtils;
 
   GraphSliderBar = function(paper) {
     var mouseDownX, newMouseX, bar, knob, debugStr,
@@ -69,6 +81,8 @@ var NetworkGraph;
     calculateCmpyRadius: function(cmpySize) {
       // Formula: y = -1000/(x+10) + 100
       var radius = 100 - (1000/(cmpySize+10))
+
+      // Want radius to be minimum of 10
       return Math.max(radius, 10);
     },
 
@@ -100,15 +114,20 @@ var NetworkGraph;
           myX      = el.attr('cx'),
           myY      = el.attr('cy'),
           myR      = el.attr('r'), // my radius
-          diffX    = myX - cx,
-          diffY    = cy - myY,     // browser coord system is upside down.
+          diffX    = myX - cx,     // adjacent
+          diffY    = cy - myY,     // opposite
+                                   // browser coord system is upside down.
           hypot    = Math.sqrt(diffX*diffX + diffY*diffY),
           angle    = Math.asin(diffY/hypot),
-          newHypot = rad*3/2 + myR,
-          newX, newY;
+          newHypot = Math.max(rad*3/2, 30) + myR,
+          angleIncrements = [Math.PI/2, (-1)*Math.PI/2, Math.PI],
+          len = angleIncrements.length,
+          i = 0,
+          newX, newY, tmpAngle;
 
       this.el.stop(); // stop any existing animation
 
+      // Handle some ambiguous cases.
       if (diffX < 0 && diffY > 0) {
         angle = pi - angle;
       }
@@ -118,8 +137,28 @@ var NetworkGraph;
       else if (myY === cy && diffX < 0) {
         angle = pi;
       }
+
       newX     = cx + Math.cos(angle)*newHypot,
       newY     = cy + Math.sin(angle)*newHypot * (-1); // flip to right side up
+
+      // Handle circle flying out of bounds.
+      // Try going right 90 degrees, then left 90 degrees, then 180.
+      while (!GraphUtils.isInBounds(newX, newY, myR)) {
+        if (i >= len) {
+          break;
+        }
+        tmpAngle = angle + angleIncrements[i++];
+        newX     = cx + Math.cos(tmpAngle)*newHypot,
+        newY     = cy + Math.sin(tmpAngle)*newHypot * (-1); // flip to right side up
+      }
+
+      if (!GraphUtils.isInBounds(newX, newY, myR)) {
+        // Didn't find a new in-bounds position. This shouldn't happen.
+        console.log('Couldn\'t find a in-bounds position to jump to!');
+      }
+      else {
+        angle = tmpAngle;
+      }
 
       this.el.animate({ 'cx': newX, 'cy': newY }, 500, 'ease-out');
       this.label.attr({ 'x': newX, 'y': newY - this.el.attr('r') - 5 });
@@ -187,22 +226,6 @@ var NetworkGraph;
       collidingCircles = [];
     },
 
-    // isInBounds
-    // ==========
-    // Returns if the circle is in bounds.
-    isInBounds: function() {
-      var el = this.el,
-          x  = this.el.attr('cx'),
-          y  = this.el.attr('cy'),
-          r  = this.el.attr('r'),
-          padding = 0;
-
-      return (x - r) > padding &&
-             (x + r) < PAPER_WIDTH - padding &&
-             (y - r) > padding &&
-             (y + r) < BAR_CENTER_Y - padding;
-    },
-
     handleDrag: function(dx, dy) {
       var newX, newY, el = this.el;
       newX = el.mouseDownX + dx;
@@ -237,20 +260,19 @@ var NetworkGraph;
           left    = x - radius,
           top     = y - radius,
           right   = left + 2*radius,
-          bottom  = top + 2*radius,
-          padding = 10;
+          bottom  = top + 2*radius;
 
-      if (left < padding) {
-        x = padding + radius;
+      if (left < VIEWPORT_PADDING) {
+        x = VIEWPORT_PADDING + radius;
       }
-      else if (right > PAPER_WIDTH - padding) {
-        x = PAPER_WIDTH - padding - radius;
+      else if (right > VIEWPORT_RIGHT) {
+        x = PAPER_WIDTH - VIEWPORT_PADDING - radius;
       }
-      if (top < padding) {
-        y = padding + radius;
+      if (top < VIEWPORT_PADDING) {
+        y = VIEWPORT_PADDING + radius;
       }
-      else if (bottom > BAR_TOP_Y - padding) {
-        y = BAR_TOP_Y - padding - radius;
+      else if (bottom > BAR_TOP_Y - VIEWPORT_PADDING) {
+        y = BAR_TOP_Y - VIEWPORT_PADDING - radius;
       }
 
       return { x: x,
@@ -325,5 +347,17 @@ var NetworkGraph;
     }).bind(this);
 
     this.init();
+  };
+
+  GraphUtils = {
+    // isInBounds
+    // ==========
+    // Returns if the circle is in bounds.
+    isInBounds: function(x, y, r) {
+      return (x - r) > VIEWPORT_LEFT &&
+             (x + r) < VIEWPORT_RIGHT &&
+             (y - r) > VIEWPORT_TOP &&
+             (y + r) < VIEWPORT_BOTTOM;
+    },
   };
 })();
