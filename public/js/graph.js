@@ -297,12 +297,18 @@ var NetworkGraph;
 
     doDragStart: function() {
       var el = this.el;
+
       this.mouseDownX = el.attr('cx');
       this.mouseDownY = el.attr('cy');
 
-      if (isHighlighting && this !== highlightedCirc) {
-        highlightedCirc.unhighlight();
-        isHighlighting = false;
+      if (isHighlighting) {
+        if (this === highlightedCirc) {
+          return;
+        }
+        else {
+          highlightedCirc.unhighlight();
+          isHighlighting = false;
+        }
       }
 
       isDragging = true;
@@ -312,15 +318,17 @@ var NetworkGraph;
 
     doDragStop: function() {
       var el = this.el;
-      this.resetLabelPosition();
-      this.label.show();
-      this.moveOverlapCircles();
+      if (isDragging) {
+        this.resetLabelPosition();
+        this.label.show();
+        this.moveOverlapCircles();
 
-      if (!isHighlighting) {
-        el.data('cx', el.attr('cx'));
-        el.data('cy', el.attr('cy'));
+        if (!isHighlighting) {
+          el.data('cx', el.attr('cx'));
+          el.data('cy', el.attr('cy'));
+        }
+        isDragging = false;
       }
-      isDragging = false;
 
       // Have to do this stupid check because every drag event also produces a
       // click event.
