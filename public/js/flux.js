@@ -94,7 +94,7 @@ $(function() {
       // TODO: handle this more elegantly.
       throw 'SVG not supported.';
     }
-    eve.on('slider', getSnapshot);
+    eve.on('slide', getSnapshot);
 
     snapshotWorker.addEventListener('message', function(evt) {
       var date = new Date();
