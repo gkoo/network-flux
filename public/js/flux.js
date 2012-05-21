@@ -68,6 +68,9 @@ $(function() {
         timespan         = today - earliestDate;
         // no-op takes around 70-100 ms
         console.log('Processing took ' + ((new Date()).getTime() - date.getTime()) + ' milliseconds');
+        if (output) {
+          output('ready!');
+        }
       }
     }, false);
   },
@@ -88,7 +91,8 @@ $(function() {
 
   init = function() {
     if (!Raphael.svg) {
-      console.log('SVG not supported.');
+      // TODO: handle this more elegantly.
+      throw 'SVG not supported.';
     }
     eve.on('slider', getSnapshot);
 

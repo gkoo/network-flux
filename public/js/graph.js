@@ -1,12 +1,15 @@
+// TODO: redo boundary checking when resizing a circle.
 var PAPER_WIDTH     = 950,
     PAPER_HEIGHT    = 600,
     KNOB_RADIUS     = 20,
     BAR_WIDTH       = PAPER_WIDTH - KNOB_RADIUS*3,
     BAR_THICKNESS   = 10,
     BAR_CENTER_Y    = PAPER_HEIGHT-55,
+    BAR_TOP_Y       = BAR_CENTER_Y - (BAR_THICKNESS/2),
     BAR_LEFT_BOUND  = KNOB_RADIUS * 3/2,
     BAR_RIGHT_BOUND = KNOB_RADIUS*3/2 + BAR_WIDTH,
     cmpyCircles     = {},
+    currCircles     = [],
     GraphSliderBar,
     CompanyCircle,
     NetworkGraph;
@@ -35,10 +38,10 @@ GraphSliderBar = function(paper) {
   },
 
   init = function() {
-    bar = paper.rect(BAR_LEFT_BOUND,                   // top left x
-                     BAR_CENTER_Y - (BAR_THICKNESS/2), // top left y
-                     BAR_WIDTH,                        // width
-                     BAR_THICKNESS);                   // height
+    bar = paper.rect(BAR_LEFT_BOUND, // top left x
+                     BAR_TOP_Y,      // top left y
+                     BAR_WIDTH,      // width
+                     BAR_THICKNESS); // height
     bar.fill('#000');
 
     knob = paper.circle(KNOB_RADIUS*3/2 + BAR_WIDTH,  // center x
@@ -80,22 +83,107 @@ CompanyCircle.prototype = {
     return this;
   },
 
+  // findOpenSpace
+  // =============
+  // Moves a background circle out of the way of the currently highlighted
+  // circle.
+  //
+  // Thanks mathisfun.com for the trigonometry refresher!
+  // http://www.mathsisfun.com/sine-cosine-tangent.html
+  //
+  // @cx: center x of highlighted circle
+  // @cy: center y of highlighted circle
+  // @radius: radius of highlighted circle
+  findOpenSpace: function(cx, cy, rad) {
+    var el       = this.el,
+        pi       = Math.PI,
+        myX      = el.attr('cx'),
+        myY      = el.attr('cy'),
+        myR      = el.attr('r'), // my radius
+        diffX    = myX - cx,
+        diffY    = cy - myY,     // browser coord system is upside down.
+        hypot    = Math.sqrt(diffX*diffX + diffY*diffY),
+        angle    = Math.asin(diffY/hypot),
+        newHypot = rad*3/2 + myR,
+        newX, newY;
+
+    if (diffX < 0 && diffY > 0) {
+      angle = pi - angle;
+    }
+    else if (angle < 0 && diffX < 0 && diffY < 0) {
+      angle = pi - angle;
+    }
+    else if (myY === cy && diffX < 0) {
+      angle = pi;
+    }
+    newX     = cx + Math.cos(angle)*newHypot,
+    newY     = cy + Math.sin(angle)*newHypot * (-1); // flip to right side up
+
+    this.el.attr({ 'cx': newX,
+                   'cy': newY,
+                   'fill': '#00f'});
+  },
+
+  // TODO: redo boundary checking when resizing a circle.
   setEmployees: function(employees) {
     var oldRadius = this.el.attr('r'),
         newRadius = this.calculateCmpyRadius(employees.length),
         oldLabelY = this.label.attr('y');
+
     this.el.attr({ 'r': newRadius });
     this.label.attr({ 'y': oldLabelY + (oldRadius - newRadius) });
     return this;
   },
 
   doHoverIn: function () {
+    var el     = this.el,
+        myBBox = el.getBBox(),
+        myId   = el.id,
+        collidingCircles;
+
     this.label.show().toFront();
     this.el.toFront();
+
+    // Check if any other circles have intersecting BBoxes.
+    collidingCircles = [];
+    currCircles.forEach(function(circ) {
+      var bbox;
+
+      // Don't compare the same circle to itself
+      if (circ.el.id === myId) {
+        return;
+      }
+
+      bbox = circ.el.getBBox();
+      if (Raphael.isBBoxIntersect(myBBox, bbox)) {
+        collidingCircles.push(circ);
+      }
+    });
+
+    collidingCircles.forEach(function(circ) {
+      circ.findOpenSpace(el.attr('cx'), el.attr('cy'), el.attr('r'));
+    });
   },
 
   doHoverOut: function() {
     this.label.hide();
+    collidingCircles = [];
+  },
+
+  // isInBounds
+  // ==========
+  // Returns if the circle is in bounds.
+  isInBounds: function() {
+    var el = this.el,
+        x  = this.el.attr('cx'),
+        y  = this.el.attr('cy'),
+        r  = this.el.attr('r'),
+        padding = 0;
+
+    return (x - r) > padding &&
+           (x + r) < PAPER_WIDTH - padding &&
+           (y - r) > padding &&
+           (y + r) < BAR_CENTER_Y - padding;
   },
 
   // getCenter
@@ -104,7 +192,7 @@ CompanyCircle.prototype = {
   // completely within the boundaries of the canvas.
   getCenter: function(radius) {
     var x        = Math.floor(Math.random()*PAPER_WIDTH),
-        y        = Math.floor(Math.random()*(BAR_CENTER_Y - (BAR_THICKNESS/2))),
+        y        = Math.floor(Math.random()*BAR_TOP_Y),
         left    = x - radius,
         top     = y - radius,
         right   = left + 2*radius,
@@ -120,8 +208,8 @@ CompanyCircle.prototype = {
     if (top < padding) {
       y = padding + radius;
     }
-    else if (bottom > BAR_CENTER_Y - (BAR_THICKNESS/2) - padding) {
-      y = BAR_CENTER_Y - (BAR_THICKNESS/2) - padding - radius;
+    else if (bottom > BAR_TOP_Y - padding) {
+      y = BAR_TOP_Y - padding - radius;
     }
 
     return { x: x,
@@ -132,7 +220,8 @@ CompanyCircle.prototype = {
     var radius = this.calculateCmpyRadius(cmpyEmployees.length),
         coords = this.getCenter(radius),
         x      = coords.x,
-        y      = coords.y;
+        y      = coords.y,
+        self   = this;
 
     this.el  = paper.circle(x,      // center x
                             y,      // center y
@@ -165,6 +254,8 @@ NetworkGraph = function() {
       cmpyCircles[cmpyId].hide();
     }
 
+    currCircles = [];
+
     // Debug
     $('#output').text("Num companies: " + Object.keys(companies).length);
 
@@ -181,6 +272,8 @@ NetworkGraph = function() {
         cmpyCircle = new CompanyCircle(companies[cmpyId], cmpyNames[cmpyId], this.paper);
         cmpyCircles[cmpyId] = cmpyCircle;
       }
+
+      currCircles.push(cmpyCircle);
     }
   }).bind(this);
 
