@@ -1,4 +1,3 @@
-// TODO: redo boundary checking when resizing a circle.
 var NetworkGraph;
 
 (function() {
@@ -16,7 +15,7 @@ var NetworkGraph;
       BAR_RIGHT_BOUND  = KNOB_RADIUS*3/2 + BAR_WIDTH,
 
       // Bounding box for canvas viewport (where the circles are allowed to go)
-      VIEWPORT_PADDING = 10,
+      VIEWPORT_PADDING = 30,
       VIEWPORT_TOP     = VIEWPORT_PADDING,
       VIEWPORT_LEFT    = VIEWPORT_PADDING,
       VIEWPORT_RIGHT   = PAPER_WIDTH - VIEWPORT_PADDING,
@@ -191,14 +190,27 @@ var NetworkGraph;
       });
     },
 
-    // TODO: redo boundary checking when resizing a circle.
+    // setEmployees
+    // ============
+    // Resizes the circle based on the number of employees.
     setEmployees: function(employees) {
-      var oldRadius = this.el.attr('r'),
+      var el = this.el,
+          oldRadius = el.attr('r'),
           newRadius = this.calculateCmpyRadius(employees.length),
-          oldLabelY = this.label.attr('y');
+          oldLabelY = this.label.attr('y'),
+          x = el.attr('cx'),
+          y = el.attr('cy'),
+          point;
 
       this.size = employees.length;
-      this.el.animate({ 'r': newRadius }, 500, 'ease-out');
+
+      // recheck bounds when resizing circle
+      if (!GraphUtils.isInBounds(x, y, newRadius)) {
+        point = this.moveAwayFromEdge(x, y, newRadius);
+        x = point.x;
+        y = point.y;
+      }
+      el.animate({ 'cx': x, 'cy': y, 'r': newRadius }, 500, 'ease-out');
       this.label.attr({ 'y': oldLabelY + (oldRadius - newRadius) });
       return this;
     },
@@ -230,8 +242,12 @@ var NetworkGraph;
       var newX, newY, el = this.el;
       newX = el.mouseDownX + dx;
       newY = el.mouseDownY + dy;
-      el.attr({ 'cx': newX });
-      el.attr({ 'cy': newY });
+      if (GraphUtils.xInBounds(newX, el.attr('r'))) {
+        el.attr({ 'cx': newX });
+      }
+      if (GraphUtils.yInBounds(newY, el.attr('r'))) {
+        el.attr({ 'cy': newY });
+      }
     },
 
     handleDragStart: function() {
@@ -250,33 +266,46 @@ var NetworkGraph;
       this.moveOverlapCircles();
     },
 
+    moveAwayFromEdge: function(x, y, r) {
+      var left   = x - r,
+          top    = y - r,
+          right  = left + 2*r,
+          bottom = top + 2*r;
+
+      if (typeof x === 'undefined') {
+        x = this.el.attr('x');
+        y = this.el.attr('y');
+        r = this.el.attr('r');
+      }
+
+      if (left < VIEWPORT_PADDING) {
+        x = VIEWPORT_PADDING + r;
+      }
+      else if (right > VIEWPORT_RIGHT) {
+        x = PAPER_WIDTH - VIEWPORT_PADDING - r;
+      }
+      if (top < VIEWPORT_PADDING) {
+        y = VIEWPORT_PADDING + r;
+      }
+      else if (bottom > BAR_TOP_Y - VIEWPORT_PADDING) {
+        y = BAR_TOP_Y - VIEWPORT_PADDING - r;
+      }
+
+      return { x: x,
+               y: y };
+    },
+
     // getCenter
     // =========
     // Returns random center coordinates that ensure the circle will be drawn
     // completely within the boundaries of the canvas.
     getCenter: function(radius) {
-      var x        = Math.floor(Math.random()*PAPER_WIDTH),
-          y        = Math.floor(Math.random()*BAR_TOP_Y),
-          left    = x - radius,
-          top     = y - radius,
-          right   = left + 2*radius,
-          bottom  = top + 2*radius;
+      var x      = Math.floor(Math.random()*PAPER_WIDTH),
+          y      = Math.floor(Math.random()*BAR_TOP_Y),
+          point  = this.moveAwayFromEdge(x, y, radius);
 
-      if (left < VIEWPORT_PADDING) {
-        x = VIEWPORT_PADDING + radius;
-      }
-      else if (right > VIEWPORT_RIGHT) {
-        x = PAPER_WIDTH - VIEWPORT_PADDING - radius;
-      }
-      if (top < VIEWPORT_PADDING) {
-        y = VIEWPORT_PADDING + radius;
-      }
-      else if (bottom > BAR_TOP_Y - VIEWPORT_PADDING) {
-        y = BAR_TOP_Y - VIEWPORT_PADDING - radius;
-      }
-
-      return { x: x,
-               y: y };
+      return { x: point.x,
+               y: point.y };
     },
 
     init: function(cmpyEmployees, cmpyName, paper) {
@@ -354,10 +383,17 @@ var NetworkGraph;
     // ==========
     // Returns if the circle is in bounds.
     isInBounds: function(x, y, r) {
-      return (x - r) > VIEWPORT_LEFT &&
-             (x + r) < VIEWPORT_RIGHT &&
-             (y - r) > VIEWPORT_TOP &&
-             (y + r) < VIEWPORT_BOTTOM;
+      return this.xInBounds(x, r) && this.yInBounds(y, r);
     },
+
+    xInBounds: function(x, r) {
+      return (x - r) > VIEWPORT_LEFT &&
+             (x + r) < VIEWPORT_RIGHT;
+    },
+
+    yInBounds: function(y, r) {
+      return (y - r) > VIEWPORT_TOP &&
+             (y + r) < VIEWPORT_BOTTOM;
+    }
   };
 })();
