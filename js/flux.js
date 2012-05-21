@@ -23,7 +23,7 @@ $(function() {
       profileObjs,
       earliestDate,
       timespan,
-      snapshotWorker = new Worker('/js/snapshotWorker.js'),
+      snapshotWorker = new Worker('js/snapshotWorker.js'),
 
   /**
    * getSnapshot
@@ -57,7 +57,7 @@ $(function() {
 
     date = new Date();
 
-    cxnWorker = new Worker('/js/cxnWorker.js');
+    cxnWorker = new Worker('js/cxnWorker.js');
     cxnWorker.postMessage({ profiles: allProfiles });
     cxnWorker.addEventListener('message', function(evt) {
       if (evt.data) {
