@@ -1,6 +1,12 @@
 // TODO: include duplicates for company-employee pair
 // TODO: handle no-connections case
 //
+// IDEAS
+// =====
+// 1) Click on a circle to show faces of the employees there.
+// 2) Toggle names on and off
+// 3) Add "life" to the circles. Bigger circles move slower, smaller ones move faster.
+//
 // http://caniuse.com/webworkers
 var onLinkedInLoad;
 
@@ -17,7 +23,7 @@ $(function() {
       profileObjs,
       earliestDate,
       timespan,
-      snapshotWorker = new Worker('js/snapshotWorker.js'),
+      snapshotWorker = new Worker('/js/snapshotWorker.js'),
 
   /**
    * getSnapshot
@@ -50,22 +56,23 @@ $(function() {
     allProfiles = cxns;
 
     date = new Date();
-    if (DO_PROCESSING) {
-      cxnWorker = new Worker('js/cxnWorker.js');
-      cxnWorker.postMessage({ profiles: allProfiles });
-      cxnWorker.addEventListener('message', function(evt) {
-        if (evt.data) {
-          //filterConnectionsResult(evt.data.coworkers);
-          allCmpyEmployees = evt.data.companies;
-          cmpyNames        = evt.data.cmpyNames;
-          profileObjs      = evt.data.profileObjs;
-          earliestDate     = evt.data.earliestDate;
-          timespan         = today - earliestDate;
-          // no-op takes around 70-100 ms
-          console.log('Processing took ' + ((new Date()).getTime() - date.getTime()) + ' milliseconds');
+
+    cxnWorker = new Worker('/js/cxnWorker.js');
+    cxnWorker.postMessage({ profiles: allProfiles });
+    cxnWorker.addEventListener('message', function(evt) {
+      if (evt.data) {
+        allCmpyEmployees = evt.data.companies;
+        cmpyNames        = evt.data.cmpyNames;
+        profileObjs      = evt.data.profileObjs;
+        earliestDate     = evt.data.earliestDate;
+        timespan         = today - earliestDate;
+        // no-op takes around 70-100 ms
+        console.log('Processing took ' + ((new Date()).getTime() - date.getTime()) + ' milliseconds');
+        if (output) {
+          output('ready!');
         }
-      }, false);
-    }
+      }
+    }, false);
   },
 
   handleOwnProfile = function(data) {
@@ -80,7 +87,25 @@ $(function() {
     if (myProfile) {
       processProfiles();
     }
-  };
+  },
+
+  init = function() {
+    if (!Raphael.svg) {
+      // TODO: handle this more elegantly.
+      throw 'SVG not supported.';
+    }
+    eve.on('slider', getSnapshot);
+
+    snapshotWorker.addEventListener('message', function(evt) {
+      var date = new Date();
+      currCompanies = evt.data ? evt.data.currCompanies : null;
+      if (currCompanies) {
+        graph.renderCompanies(currCompanies, cmpyNames);
+        // no-op takes around 70-100 ms
+        console.log('Processing took ' + ((new Date()).getTime() - date.getTime()) + ' milliseconds');
+      }
+    }, false);
+  },
 
   onLinkedInAuth = function() {
     var fields = ["id", "first-name", "last-name","positions:(start-date,end-date,company:(id,name))","picture-url","educations:(school-name,start-date,end-date)","site-standard-profile-request:(url)"];
@@ -100,16 +125,5 @@ $(function() {
     IN.Event.on(IN, "auth", onLinkedInAuth);
   };
 
-  snapshotWorker.addEventListener('message', function(evt) {
-    var date = new Date();
-    currCompanies = evt.data ? evt.data.currCompanies : null;
-    if (currCompanies) {
-      //filterConnectionsResult(evt.data.coworkers);
-      graph.renderCompanies(currCompanies, cmpyNames);
-      // no-op takes around 70-100 ms
-      console.log('Processing took ' + ((new Date()).getTime() - date.getTime()) + ' milliseconds');
-    }
-  }, false);
-
-  eve.on('slider', getSnapshot);
+  init();
 });
