@@ -20,10 +20,17 @@ var NetworkGraph;
       VIEWPORT_LEFT    = VIEWPORT_PADDING,
       VIEWPORT_RIGHT   = PAPER_WIDTH - VIEWPORT_PADDING,
       VIEWPORT_BOTTOM  = BAR_TOP_Y - VIEWPORT_PADDING,
+      VIEWPORT_MID_X   = VIEWPORT_PADDING + (VIEWPORT_RIGHT - VIEWPORT_LEFT)/2,
+      VIEWPORT_MID_Y   = VIEWPORT_PADDING + (VIEWPORT_BOTTOM - VIEWPORT_TOP)/2,
+
+      ANIM_DURATION    = 500,
 
       cmpyCircles      = {}, // all circles created up to this point
       currCircles      = [], // the circles currently drawn in the viewport
       isDragging       = false,
+      isHighlighting   = false, // are we highlighting a circle?
+      highlightedCirc,
+
       GraphSliderBar,
       CompanyCircle,
       GraphUtils;
@@ -79,6 +86,7 @@ var NetworkGraph;
   CompanyCircle.prototype = {
     calculateCmpyRadius: function(cmpySize) {
       // Formula: y = -1000/(x+10) + 100
+      // http://www.mathsisfun.com/data/function-grapher.php
       var radius = 100 - (1000/(cmpySize+10))
 
       // Want radius to be minimum of 10
@@ -94,6 +102,23 @@ var NetworkGraph;
       this.el.hide();
       this.label.hide();
       return this;
+    },
+
+    // Convenience method to move both the circle and the label
+    move: function(x, y, animate) {
+      var coords = { 'cx': x, 'cy': y },
+          el     = this.el;
+      this.label.hide();
+      if (animate) {
+        el.animate(coords, ANIM_DURATION, 'ease-out');
+      }
+      else {
+        el.attr(coords);
+      }
+      this.label.attr({
+                        'x': x,
+                        'y': y - el.attr('r') - 5
+                      });
     },
 
     // findOpenSpace
@@ -159,8 +184,7 @@ var NetworkGraph;
         angle = tmpAngle;
       }
 
-      this.el.animate({ 'cx': newX, 'cy': newY }, 500, 'ease-out');
-      this.label.attr({ 'x': newX, 'y': newY - this.el.attr('r') - 5 });
+      this.move(newX, newY, true);
     },
 
     // moveOverlapCircles
@@ -210,7 +234,7 @@ var NetworkGraph;
         x = point.x;
         y = point.y;
       }
-      el.animate({ 'cx': x, 'cy': y, 'r': newRadius }, 500, 'ease-out');
+      el.animate({ 'cx': x, 'cy': y, 'r': newRadius }, ANIM_DURATION, 'ease-out');
       this.label.attr({ 'y': oldLabelY + (oldRadius - newRadius) });
       return this;
     },
@@ -227,10 +251,13 @@ var NetworkGraph;
         return;
       }
 
-      this.label.show().toFront();
-      this.el.toFront();
+      this.label.show();
 
-      this.moveOverlapCircles();
+      if (!isHighlighting) {
+        this.label.toFront();
+        this.el.toFront();
+        this.moveOverlapCircles();
+      }
     },
 
     doHoverOut: function() {
@@ -238,32 +265,67 @@ var NetworkGraph;
       collidingCircles = [];
     },
 
-    handleDrag: function(dx, dy) {
-      var newX, newY, el = this.el;
-      newX = el.mouseDownX + dx;
-      newY = el.mouseDownY + dy;
-      if (GraphUtils.xInBounds(newX, el.attr('r'))) {
-        el.attr({ 'cx': newX });
-      }
-      if (GraphUtils.yInBounds(newY, el.attr('r'))) {
-        el.attr({ 'cy': newY });
+    doClick: function() {
+      if (this.clicked) {
+        if (isHighlighting && this != highlightedCirc) {
+          // Clicked on a circle, but another was highlighted.
+          // Unhighlight that one, then highlight this one.
+          highlightedCirc.unhighlight();
+        }
+        else {
+          isHighlighting = !isHighlighting;
+        }
+        highlightedCirc = this;
+        eve('circleClick', this);
       }
     },
 
-    handleDragStart: function() {
+    doDrag: function(dx, dy) {
+      var newX, newY, el;
+      if (isDragging) {
+        el = this.el;
+        newX = this.mouseDownX + dx;
+        newY = this.mouseDownY + dy;
+        if (GraphUtils.xInBounds(newX, el.attr('r'))) {
+          el.attr({ 'cx': newX });
+        }
+        if (GraphUtils.yInBounds(newY, el.attr('r'))) {
+          el.attr({ 'cy': newY });
+        }
+      }
+    },
+
+    doDragStart: function() {
       var el = this.el;
+      this.mouseDownX = el.attr('cx');
+      this.mouseDownY = el.attr('cy');
+
+      if (isHighlighting && this !== highlightedCirc) {
+        highlightedCirc.unhighlight();
+        isHighlighting = false;
+      }
+
       isDragging = true;
       el.stop();
-      el.mouseDownX = el.attr('cx');
-      el.mouseDownY = el.attr('cy');
       this.label.hide();
     },
 
-    handleDragStop: function() {
-      isDragging = false;
+    doDragStop: function() {
+      var el = this.el;
       this.resetLabelPosition();
       this.label.show();
       this.moveOverlapCircles();
+
+      if (!isHighlighting) {
+        el.data('cx', el.attr('cx'));
+        el.data('cy', el.attr('cy'));
+      }
+      isDragging = false;
+
+      // Have to do this stupid check because every drag event also produces a
+      // click event.
+      this.clicked = (this.mouseDownX === el.attr('cx') &&
+                      this.mouseDownY === el.attr('cy'));
     },
 
     moveAwayFromEdge: function(x, y, r) {
@@ -308,6 +370,33 @@ var NetworkGraph;
                y: point.y };
     },
 
+    highlight: function() {
+      var self = this;
+      this.move(VIEWPORT_MID_X, VIEWPORT_MID_Y, true);
+      setTimeout(function() {
+        self.moveOverlapCircles();
+      }, ANIM_DURATION);
+    },
+
+    unhighlight: function() {
+      // move back to original position
+      var el = this.el,
+          cx = el.data('cx');
+          cy = el.data('cy');
+
+      el.toFront();
+      this.move(cx, cy, true);
+    },
+
+    handleClick: function() {
+      if (isHighlighting) {
+        this.highlight();
+      }
+      else {
+        this.unhighlight();
+      }
+    },
+
     init: function(cmpyEmployees, cmpyName, paper) {
       var radius = this.calculateCmpyRadius(cmpyEmployees.length),
           coords = this.getCenter(radius),
@@ -315,11 +404,13 @@ var NetworkGraph;
           y      = coords.y,
           self   = this;
 
-      this.el  = paper.circle(x,      // center x
-                              y,      // center y
-                              radius) // radius
+      this.el  = paper.circle(x, // center x
+                              y, // center y
+                              radius)
                       .fill('#fff')
-                      .data('size', cmpyEmployees.length);
+                      .data('size', cmpyEmployees.length)
+                      .data('cx', x)
+                      .data('cy', y);
 
       this.label = paper.text(x, y-radius-5, cmpyName)
                         .fill('#000')
@@ -329,22 +420,31 @@ var NetworkGraph;
                     this.doHoverOut,
                     this,
                     this)
-             .drag(this.handleDrag,
-                   this.handleDragStart,
-                   this.handleDragStop,
+             .click(this.doClick, this)
+             .drag(this.doDrag,
+                   this.doDragStart,
+                   this.doDragStop,
                    this,
                    this,
                    this);
+
+      eve.on('circleClick', this.handleClick);
     }
   };
 
   NetworkGraph = function() {
-    this.init = function() {
+    this.init();
+  };
+
+  NetworkGraph.prototype = {
+    init: function() {
       this.paper = new Raphael(document.getElementById('canvas-container'), PAPER_WIDTH, PAPER_HEIGHT);
       this.sliderBar = new GraphSliderBar(this.paper);
-    };
 
-    this.renderCompanies = (function(companies, cmpyNames) {
+      //eve.on('circleClick', this.fadeOtherCircles);
+    },
+
+    renderCompanies: function(companies, cmpyNames) {
       var cmpyCircle, x, y, radius;
 
       // Hide current company circles
@@ -373,9 +473,17 @@ var NetworkGraph;
 
         currCircles.push(cmpyCircle);
       }
-    }).bind(this);
+    },
 
-    this.init();
+    fadeOtherCircles: function() {
+      var self = this,
+          fill = isHighlighting ? '#004' : '#fff';
+      currCircles.forEach(function(circ) {
+        if (circ.el.id !== self.el.id) {
+          circ.el.animate({ 'fill': fill }, 2000, 'linear');
+        }
+      });
+    }
   };
 
   GraphUtils = {

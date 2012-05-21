@@ -9,6 +9,7 @@
 //
 // http://caniuse.com/webworkers
 var onLinkedInLoad;
+var snapshotDate;
 
 $(function() {
   var myProfile,
@@ -33,6 +34,7 @@ $(function() {
   getSnapshot = function(percent) {
     var targetDate = earliestDate + (timespan * percent/100);
     currCompanies = {};
+    snapshotDate = new Date();
     snapshotWorker.postMessage({ allCmpyEmployees: allCmpyEmployees,
                                  targetDate:       targetDate });
   }
@@ -102,7 +104,7 @@ $(function() {
       if (currCompanies) {
         graph.renderCompanies(currCompanies, cmpyNames);
         // no-op takes around 70-100 ms
-        console.log('Processing took ' + ((new Date()).getTime() - date.getTime()) + ' milliseconds');
+        console.log('Processing took ' + (date.getTime() - snapshotDate.getTime()) + ' milliseconds');
       }
     }, false);
   },
