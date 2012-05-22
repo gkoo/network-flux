@@ -25,7 +25,8 @@ var NetworkGraph;
 
       ANIM_DURATION    = 500,
 
-      cmpyCircles      = {}, // all circles created up to this point
+      cmpyCircles      = {}, // all company circles created up to this point
+      cxnCircles       = {}, // all connection circles created up to this point
       currCircles      = [], // the circles currently drawn in the viewport
       isDragging       = false,
       isHighlighting   = false, // are we highlighting a circle?
@@ -52,8 +53,8 @@ var NetworkGraph;
     handleKnobDragStart = function(x, y, evt) {
       mouseDownX = knob.attr('cx');
       if (isHighlighting && highlightedCirc) {
-        highlightedCirc.unhighlight();
         isHighlighting = false;
+        eve('circleClick', highlightedCirc);
       }
     },
 
@@ -99,6 +100,14 @@ var NetworkGraph;
                      .hide();
     },
 
+    setCenter: function(cx, cy) {
+      var imgDim = this.IMG_DIM,
+          x = cx - imgDim/2,
+          y = cy - imgDim/2;
+
+      this.el.attr({ 'x': x, 'y': y });
+    },
+
     hide: function() {
       this.el.hide();
     },
@@ -114,9 +123,9 @@ var NetworkGraph;
 
   CompanyCircle.prototype = {
     calculateCmpyRadius: function(cmpySize) {
-      // Formula: y = -1000/(x+10) + 100
+      // Formula: y = -15000/(x+100) + 150
       // http://www.mathsisfun.com/data/function-grapher.php
-      var radius = 100 - (1000/(cmpySize+10))
+      var radius = 150 - (15000/(cmpySize+100))
 
       // Want radius to be minimum of 10
       return Math.max(radius, 10);
@@ -178,7 +187,7 @@ var NetworkGraph;
           angle    = Math.asin(diffY/hypot),
           newHypot = Math.max(rad*3/2, 30) + myR,
           angleIncrements = [Math.PI/2, (-1)*Math.PI/2, Math.PI],
-          i, len, newX, newY, tmpAngle;
+          newCenter, i, len, newX, newY, tmpAngle;
 
       this.el.stop(); // stop any existing animation
 
@@ -212,6 +221,10 @@ var NetworkGraph;
       if (!GraphUtils.isInBounds(newX, newY, myR)) {
         // Didn't find a new in-bounds position. This shouldn't happen.
         console.log('Couldn\'t find a in-bounds position to jump to!');
+        // Last resort ... just find a random x,y to jump to
+        newCenter = GraphUtils.getRandomCenter(myR);
+        newX = newCenter.x;
+        newY = newCenter.y;
       }
       else {
         angle = tmpAngle;
@@ -244,6 +257,7 @@ var NetworkGraph;
 
       overlapCircles.forEach(function(circ) {
         circ.findOpenSpace(el.attr('cx'), el.attr('cy'), el.attr('r'));
+        circ.el.toBack();
       });
     },
 
@@ -260,10 +274,11 @@ var NetworkGraph;
           point;
 
       this.employees = employees;
+      this.pictures = [];
 
       // recheck bounds when resizing circle
       if (!GraphUtils.isInBounds(x, y, newRadius)) {
-        point = this.moveAwayFromEdge(x, y, newRadius);
+        point = GraphUtils.moveAwayFromEdge(x, y, newRadius);
         x = point.x;
         y = point.y;
       }
@@ -368,48 +383,6 @@ var NetworkGraph;
                       this.mouseDownY === el.attr('cy'));
     },
 
-    moveAwayFromEdge: function(x, y, r) {
-      var left   = x - r,
-          top    = y - r,
-          right  = left + 2*r,
-          bottom = top + 2*r;
-
-      if (typeof x === 'undefined') {
-        x = this.el.attr('x');
-        y = this.el.attr('y');
-        r = this.el.attr('r');
-      }
-
-      if (left < VIEWPORT_PADDING) {
-        x = VIEWPORT_PADDING + r;
-      }
-      else if (right > VIEWPORT_RIGHT) {
-        x = PAPER_WIDTH - VIEWPORT_PADDING - r;
-      }
-      if (top < VIEWPORT_PADDING) {
-        y = VIEWPORT_PADDING + r;
-      }
-      else if (bottom > BAR_TOP_Y - VIEWPORT_PADDING) {
-        y = BAR_TOP_Y - VIEWPORT_PADDING - r;
-      }
-
-      return { x: x,
-               y: y };
-    },
-
-    // getCenter
-    // =========
-    // Returns random center coordinates that ensure the circle will be drawn
-    // completely within the boundaries of the canvas.
-    getCenter: function(radius) {
-      var x      = Math.floor(Math.random()*PAPER_WIDTH),
-          y      = Math.floor(Math.random()*BAR_TOP_Y),
-          point  = this.moveAwayFromEdge(x, y, radius);
-
-      return { x: point.x,
-               y: point.y };
-    },
-
     // loadEmployees
     // =============
     // Creates the ConnectionCircles, so that we can start loading images, but
@@ -420,56 +393,33 @@ var NetworkGraph;
           ringNum      = 0, // concentric circles around which to position pictures
           pi           = Math.PI,
           cmpyR        = this.el.attr('r'),
-          anglesNarrow = [pi/2, 3*pi/2, 0, pi, pi/4, 5*pi/4, 3*pi/4, 7*pi/4],
-          anglesMed    = [pi/2, pi/3, pi/6, 0, 11*pi/6, 5*pi/3, 3*pi/2, 4*pi/3,
-                          7*pi/6, pi, 5*pi/6, 2*pi/3], // start from top and work clockwise around
-          anglesWide   = [pi/2, pi/3, pi/4, pi/6, 0, 11*pi/6, 7*pi/4, 5*pi/3,
-                          3*pi/2, 4*pi/3, 5*pi/4, 7*pi/6, pi, 5*pi/6, 3*pi/4,
-                          2*pi/3],
           i, len;
 
-      this.pictures = [];
-      for (i = 0, len = this.employees.length; i < len; ++i) {
-        var empId       = this.employees[i],
-            profile     = profileData[empId],
+      this.employees.forEach(function(empId) {
+        var profile     = profileData[empId],
             IMG_DIM     = 80,
             ringRadius  = cmpyR + 10 + ringNum*IMG_DIM + IMG_DIM/2,
-            anglesToUse, cx, cy;
-
-        // Choose how far apart to space circles based on ring number.
-        switch (ringNum) {
-          case 0:
-            anglesToUse = anglesNarrow;
-            break;
-          case 1:
-            anglesToUse = anglesMed;
-            break;
-          default:
-            anglesToUse = anglesWide;
-        }
-
-        cx = VIEWPORT_MID_X + Math.cos(anglesToUse[idx])*ringRadius,
-        cy = VIEWPORT_MID_Y + Math.sin(anglesToUse[idx])*ringRadius*(-1); // -1 for upside down browser coords
+            cxnCircle, angles, center, cx, cy;
 
         if (profile.pictureUrl) {
-          self.pictures.push(new ConnectionCircle(profile, cx, cy));
-          //output(profile.firstName + ' ' + profile.lastName);
 
-          if (idx >= anglesToUse.length -1) {
-            ++ringNum;
+          cxnCircle = cxnCircles[profile.id];
+          if (!cxnCircle) {
+            center = GraphUtils.getRandomCenter(IMG_DIM),
+            cxnCircle = new ConnectionCircle(profile, center.x, center.y);
+            cxnCircles[profile.id] = cxnCircle;
           }
-
-          idx = (idx + 1) % anglesToUse.length;
+          self.pictures.push(cxnCircle);
         }
-      };
+      });
     },
 
     // showEmployees
     // =============
     // Reveals the ConnectionCircles
     showEmployees: function() {
-      this.pictures.forEach(function(picCircle) {
-        picCircle.show();
+      this.pictures.forEach(function(cxnCirc) {
+        cxnCirc.show();
       });
     },
 
@@ -494,8 +444,8 @@ var NetworkGraph;
       $('#output').empty(); // TODO: remove this line
 
       if (this.pictures) {
-        this.pictures.forEach(function(cxnCircle) {
-          cxnCircle.hide();
+        this.pictures.forEach(function(cxnCirc) {
+          cxnCirc.hide();
         });
       }
     },
@@ -511,7 +461,7 @@ var NetworkGraph;
 
     init: function(cmpyEmployees, cmpyName) {
       var radius = this.calculateCmpyRadius(cmpyEmployees.length),
-          coords = this.getCenter(radius),
+          coords = GraphUtils.getRandomCenter(radius),
           x      = coords.x,
           y      = coords.y,
           self   = this;
@@ -542,6 +492,8 @@ var NetworkGraph;
 
       this.employees = cmpyEmployees;
 
+      this.pictures = [];
+
       eve.on('circleClick', this.handleClick);
     }
   };
@@ -555,7 +507,7 @@ var NetworkGraph;
       paper = new Raphael(document.getElementById('canvas-container'), PAPER_WIDTH, PAPER_HEIGHT);
       this.sliderBar = new GraphSliderBar();
 
-      //eve.on('circleClick', this.fadeOtherCircles);
+      eve.on('circleClick', this.fadeOtherCircles);
     },
 
     renderCompanies: function(companies, cmpyNames) {
@@ -590,11 +542,16 @@ var NetworkGraph;
     },
 
     fadeOtherCircles: function() {
-      var self = this,
-          fill = isHighlighting ? '#004' : '#fff';
+      var self = this; // "this" is bound to circle that was clicked.
+
       currCircles.forEach(function(circ) {
         if (circ.el.id !== self.el.id) {
-          circ.el.animate({ 'fill': fill }, 2000, 'linear');
+          if (isHighlighting) {
+            circ.el.hide();
+          }
+          else {
+            circ.el.show();
+          }
         }
       });
     },
@@ -620,6 +577,42 @@ var NetworkGraph;
     yInBounds: function(y, r) {
       return (y - r) > VIEWPORT_TOP &&
              (y + r) < VIEWPORT_BOTTOM;
-    }
+    },
+
+    // getRandomCenter
+    // ===============
+    // Returns random center coordinates that ensure the circle will be drawn
+    // completely within the boundaries of the canvas.
+    getRandomCenter: function(radius) {
+      var x      = Math.floor(Math.random()*(VIEWPORT_RIGHT-VIEWPORT_LEFT)) +
+                   VIEWPORT_PADDING,
+          y      = Math.floor(Math.random()*(BAR_TOP_Y - VIEWPORT_PADDING)) +
+                   VIEWPORT_PADDING;
+
+      return GraphUtils.moveAwayFromEdge(x, y, radius);
+    },
+
+    moveAwayFromEdge: function(x, y, r) {
+      var left   = x - r,
+          top    = y - r,
+          right  = left + 2*r,
+          bottom = top + 2*r;
+
+      if (left < VIEWPORT_PADDING) {
+        x = VIEWPORT_PADDING + r;
+      }
+      else if (right > VIEWPORT_RIGHT) {
+        x = PAPER_WIDTH - VIEWPORT_PADDING - r;
+      }
+      if (top < VIEWPORT_PADDING) {
+        y = VIEWPORT_PADDING + r;
+      }
+      else if (bottom > BAR_TOP_Y - VIEWPORT_PADDING) {
+        y = BAR_TOP_Y - VIEWPORT_PADDING - r;
+      }
+
+      return { x: x,
+               y: y };
+    },
   };
 })();
