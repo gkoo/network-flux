@@ -73,7 +73,6 @@ createCmpyBuckets = function(profiles, callback) {
         }
       });
     }
-    /*
     if (educations) {
       educations.forEach(function(edu) {
         if (edu.schoolName && edu.startDate) {
@@ -87,7 +86,6 @@ createCmpyBuckets = function(profiles, callback) {
         }
       });
     }
-    */
 
     profileObjs[profile.id] = profile;
   });
@@ -100,7 +98,7 @@ createCmpyBuckets = function(profiles, callback) {
   });
 };
 
-importScripts('helpers.js');
+importScripts('/js/helpers.js');
 
 self.addEventListener('message', function(evt) {
   var profiles = evt.data.profiles;

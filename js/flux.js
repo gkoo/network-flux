@@ -1,5 +1,6 @@
 // TODO: include duplicates for company-employee pair
 // TODO: handle no-connections case
+// TODO: check for web worker support
 //
 // IDEAS
 // =====
@@ -9,6 +10,7 @@
 //
 // http://caniuse.com/webworkers
 var onLinkedInLoad;
+var snapshotDate;
 
 $(function() {
   var myProfile,
@@ -23,7 +25,7 @@ $(function() {
       profileObjs,
       earliestDate,
       timespan,
-      snapshotWorker = new Worker('js/snapshotWorker.js'),
+      snapshotWorker,
 
   /**
    * getSnapshot
@@ -33,6 +35,8 @@ $(function() {
   getSnapshot = function(percent) {
     var targetDate = earliestDate + (timespan * percent/100);
     currCompanies = {};
+    $('#debug').text(new Date(targetDate));
+    snapshotDate = new Date();
     snapshotWorker.postMessage({ allCmpyEmployees: allCmpyEmployees,
                                  targetDate:       targetDate });
   }
@@ -66,6 +70,8 @@ $(function() {
         profileObjs      = evt.data.profileObjs;
         earliestDate     = evt.data.earliestDate;
         timespan         = today - earliestDate;
+
+        graph.setProfiles(profileObjs);
         // no-op takes around 70-100 ms
         console.log('Processing took ' + ((new Date()).getTime() - date.getTime()) + ' milliseconds');
         if (output) {
@@ -96,13 +102,14 @@ $(function() {
     }
     eve.on('slide', getSnapshot);
 
+    snapshotWorker = new Worker('js/snapshotWorker.js');
     snapshotWorker.addEventListener('message', function(evt) {
       var date = new Date();
       currCompanies = evt.data ? evt.data.currCompanies : null;
       if (currCompanies) {
         graph.renderCompanies(currCompanies, cmpyNames);
         // no-op takes around 70-100 ms
-        console.log('Processing took ' + ((new Date()).getTime() - date.getTime()) + ' milliseconds');
+        console.log('Processing took ' + (date.getTime() - snapshotDate.getTime()) + ' milliseconds');
       }
     }, false);
   },
