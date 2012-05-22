@@ -98,7 +98,7 @@ createCmpyBuckets = function(profiles, callback) {
   });
 };
 
-importScripts('/js/helpers.js');
+importScripts('js/helpers.js');
 
 self.addEventListener('message', function(evt) {
   var profiles = evt.data.profiles;
