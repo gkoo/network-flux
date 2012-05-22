@@ -30,25 +30,31 @@ var NetworkGraph;
       isDragging       = false,
       isHighlighting   = false, // are we highlighting a circle?
       highlightedCirc,
+      profileData,
+      paper,
 
       GraphSliderBar,
+      ConnectionCircle,
       CompanyCircle,
       GraphUtils;
 
-  GraphSliderBar = function(paper) {
-    var mouseDownX, newMouseX, bar, knob, debugStr,
+  GraphSliderBar = function() {
+    var mouseDownX, newMouseX, bar, knob,
 
     handleKnobDrag = function(dx) {
       newX = mouseDownX + dx;
       if (newX >= BAR_LEFT_BOUND && newX <= BAR_RIGHT_BOUND) {
         newMouseX = newX;
         knob.attr({ 'cx': newX });
-        //debugStr.attr({ 'text': Math.floor((newX-BAR_LEFT_BOUND)/BAR_WIDTH * 100) + '%' });
       }
     },
 
     handleKnobDragStart = function(x, y, evt) {
       mouseDownX = knob.attr('cx');
+      if (isHighlighting && highlightedCirc) {
+        highlightedCirc.unhighlight();
+        isHighlighting = false;
+      }
     },
 
     handleKnobDragStop = function(x, y, evt) {
@@ -71,16 +77,39 @@ var NetworkGraph;
       knob.drag(handleKnobDrag,
                 handleKnobDragStart,
                 handleKnobDragStop);
-
-      //debugStr = paper.text(50, 50, 'Hi')
-                      //.attr({ 'font-size': 18 });
     };
 
     init();
   };
 
-  CompanyCircle = function(cmpyEmployees, cmpyName, paper) {
-    this.init(cmpyEmployees, cmpyName, paper);
+  ConnectionCircle = function(profile, cx, cy) {
+    this.init(profile, cx, cy);
+  };
+
+  ConnectionCircle.prototype = {
+    IMG_DIM: 80,
+
+    init: function(profile, cx, cy) {
+      var imgDim = this.IMG_DIM,
+          x = cx - imgDim/2,
+          y = cy - imgDim/2;
+
+      this.el = paper.rect(x, y, imgDim, imgDim, imgDim/2)
+                     .attr({ 'fill': 'url(' + profile.pictureUrl + ')' })
+                     .hide();
+    },
+
+    hide: function() {
+      this.el.hide();
+    },
+
+    show: function() {
+      this.el.show();
+    }
+  };
+
+  CompanyCircle = function(cmpyEmployees, cmpyName) {
+    this.init(cmpyEmployees, cmpyName);
   };
 
   CompanyCircle.prototype = {
@@ -104,13 +133,17 @@ var NetworkGraph;
       return this;
     },
 
+    // move
+    // ====
     // Convenience method to move both the circle and the label
-    move: function(x, y, animate) {
+    //
+    // @onComplete: callback to be invoked when animation is complete.
+    move: function(x, y, animate, onComplete) {
       var coords = { 'cx': x, 'cy': y },
           el     = this.el;
       this.label.hide();
       if (animate) {
-        el.animate(coords, ANIM_DURATION, 'ease-out');
+        el.animate(coords, ANIM_DURATION, 'ease-out', onComplete);
       }
       else {
         el.attr(coords);
@@ -145,9 +178,7 @@ var NetworkGraph;
           angle    = Math.asin(diffY/hypot),
           newHypot = Math.max(rad*3/2, 30) + myR,
           angleIncrements = [Math.PI/2, (-1)*Math.PI/2, Math.PI],
-          len = angleIncrements.length,
-          i = 0,
-          newX, newY, tmpAngle;
+          i, len, newX, newY, tmpAngle;
 
       this.el.stop(); // stop any existing animation
 
@@ -167,6 +198,8 @@ var NetworkGraph;
 
       // Handle circle flying out of bounds.
       // Try going right 90 degrees, then left 90 degrees, then 180.
+      i = 0;
+      len = angleIncrements.length;
       while (!GraphUtils.isInBounds(newX, newY, myR)) {
         if (i >= len) {
           break;
@@ -226,7 +259,7 @@ var NetworkGraph;
           y = el.attr('cy'),
           point;
 
-      this.size = employees.length;
+      this.employees = employees;
 
       // recheck bounds when resizing circle
       if (!GraphUtils.isInBounds(x, y, newRadius)) {
@@ -234,8 +267,7 @@ var NetworkGraph;
         x = point.x;
         y = point.y;
       }
-      el.animate({ 'cx': x, 'cy': y, 'r': newRadius }, ANIM_DURATION, 'ease-out');
-      this.label.attr({ 'y': oldLabelY + (oldRadius - newRadius) });
+      el.animate({ 'cx': x, 'cy': y, 'r': newRadius }, ANIM_DURATION, 'ease-out', this.resetLabelPosition.bind(this));
       return this;
     },
 
@@ -378,12 +410,76 @@ var NetworkGraph;
                y: point.y };
     },
 
+    // loadEmployees
+    // =============
+    // Creates the ConnectionCircles, so that we can start loading images, but
+    // keeps the RaphaelJS elements hidden for now.
+    loadEmployees: function() {
+      var self         = this,
+          idx          = 0,
+          ringNum      = 0, // concentric circles around which to position pictures
+          pi           = Math.PI,
+          cmpyR        = this.el.attr('r'),
+          anglesNarrow = [pi/2, 3*pi/2, 0, pi, pi/4, 5*pi/4, 3*pi/4, 7*pi/4],
+          anglesMed    = [pi/2, pi/3, pi/6, 0, 11*pi/6, 5*pi/3, 3*pi/2, 4*pi/3,
+                          7*pi/6, pi, 5*pi/6, 2*pi/3], // start from top and work clockwise around
+          anglesWide   = [pi/2, pi/3, pi/4, pi/6, 0, 11*pi/6, 7*pi/4, 5*pi/3,
+                          3*pi/2, 4*pi/3, 5*pi/4, 7*pi/6, pi, 5*pi/6, 3*pi/4,
+                          2*pi/3],
+          i, len;
+
+      this.pictures = [];
+      for (i = 0, len = this.employees.length; i < len; ++i) {
+        var empId       = this.employees[i],
+            profile     = profileData[empId],
+            IMG_DIM     = 80,
+            ringRadius  = cmpyR + 10 + ringNum*IMG_DIM + IMG_DIM/2,
+            anglesToUse, cx, cy;
+
+        // Choose how far apart to space circles based on ring number.
+        switch (ringNum) {
+          case 0:
+            anglesToUse = anglesNarrow;
+            break;
+          case 1:
+            anglesToUse = anglesMed;
+            break;
+          default:
+            anglesToUse = anglesWide;
+        }
+
+        cx = VIEWPORT_MID_X + Math.cos(anglesToUse[idx])*ringRadius,
+        cy = VIEWPORT_MID_Y + Math.sin(anglesToUse[idx])*ringRadius*(-1); // -1 for upside down browser coords
+
+        if (profile.pictureUrl) {
+          self.pictures.push(new ConnectionCircle(profile, cx, cy));
+          //output(profile.firstName + ' ' + profile.lastName);
+
+          if (idx >= anglesToUse.length -1) {
+            ++ringNum;
+          }
+
+          idx = (idx + 1) % anglesToUse.length;
+        }
+      };
+    },
+
+    // showEmployees
+    // =============
+    // Reveals the ConnectionCircles
+    showEmployees: function() {
+      this.pictures.forEach(function(picCircle) {
+        picCircle.show();
+      });
+    },
+
     highlight: function() {
-      var self = this;
-      this.move(VIEWPORT_MID_X, VIEWPORT_MID_Y, true);
-      setTimeout(function() {
-        self.moveOverlapCircles();
-      }, ANIM_DURATION);
+      this.loadEmployees();
+      this.move(VIEWPORT_MID_X, VIEWPORT_MID_Y, true, (function() {
+        this.moveOverlapCircles();
+        this.el.fill('#00f'); // TODO: make it glow!
+        this.showEmployees();
+      }).bind(this));
     },
 
     unhighlight: function() {
@@ -394,6 +490,14 @@ var NetworkGraph;
 
       el.toFront();
       this.move(cx, cy, true);
+      this.el.fill('#fff');
+      $('#output').empty(); // TODO: remove this line
+
+      if (this.pictures) {
+        this.pictures.forEach(function(cxnCircle) {
+          cxnCircle.hide();
+        });
+      }
     },
 
     handleClick: function() {
@@ -405,7 +509,7 @@ var NetworkGraph;
       }
     },
 
-    init: function(cmpyEmployees, cmpyName, paper) {
+    init: function(cmpyEmployees, cmpyName) {
       var radius = this.calculateCmpyRadius(cmpyEmployees.length),
           coords = this.getCenter(radius),
           x      = coords.x,
@@ -436,6 +540,8 @@ var NetworkGraph;
                    this,
                    this);
 
+      this.employees = cmpyEmployees;
+
       eve.on('circleClick', this.handleClick);
     }
   };
@@ -446,8 +552,8 @@ var NetworkGraph;
 
   NetworkGraph.prototype = {
     init: function() {
-      this.paper = new Raphael(document.getElementById('canvas-container'), PAPER_WIDTH, PAPER_HEIGHT);
-      this.sliderBar = new GraphSliderBar(this.paper);
+      paper = new Raphael(document.getElementById('canvas-container'), PAPER_WIDTH, PAPER_HEIGHT);
+      this.sliderBar = new GraphSliderBar();
 
       //eve.on('circleClick', this.fadeOtherCircles);
     },
@@ -475,7 +581,7 @@ var NetworkGraph;
         }
         // It didn't exist. Create it.
         else {
-          cmpyCircle = new CompanyCircle(companies[cmpyId], cmpyNames[cmpyId], this.paper);
+          cmpyCircle = new CompanyCircle(companies[cmpyId], cmpyNames[cmpyId]);
           cmpyCircles[cmpyId] = cmpyCircle;
         }
 
@@ -491,6 +597,10 @@ var NetworkGraph;
           circ.el.animate({ 'fill': fill }, 2000, 'linear');
         }
       });
+    },
+
+    setProfiles: function(profiles) {
+      profileData = profiles;
     }
   };
 
