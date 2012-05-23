@@ -72,6 +72,21 @@ var NetworkGraph;
       return GraphUtils.moveAwayFromEdge(x, y, radius);
     },
 
+    isIntersecting: function(circ1, circ2) {
+      var r1 = circ1.r,
+          r2 = circ2.r,
+          d1 = r1 * 2,
+          d2 = r2 * 2,
+          x1 = circ1.cx - r1,
+          x2 = circ2.cx - r2,
+          y1 = circ1.cy - r1,
+          y2 = circ2.cy - r2,
+          intersect = false;
+
+      return ((x1 + d1 >= x2 && x1 <= x2 + d2) && // x-axis intersects.
+              (y1 + d1 >= y2 && y1 <= y2 + d2)); // y-axis intersects.
+    },
+
     moveAwayFromEdge: function(x, y, r) {
       var left   = x - r,
           top    = y - r,
@@ -191,22 +206,16 @@ var NetworkGraph;
     // @cy: center y of highlighted circle
     // @radius: radius of highlighted circle
     findOpenSpace: function(cx, cy, rad) {
-      var el         = this.el,
-          pi         = Math.PI,
+      var pi         = Math.PI,
           imgRad     = this.IMG_DIM ? this.IMG_DIM/2 : null,
-          myX        = el.attr('cx') || el.attr('x') + imgRad,
-          myY        = el.attr('cy') || el.attr('y') + imgRad,
-          myR        = el.attr('r')  || imgRad, // my radius
-          diffX      = myX - cx,     // adjacent
-          diffY      = cy - myY,     // opposite
+          diffX      = this.cx - cx,     // adjacent
+          diffY      = cy - this.cy,     // opposite
                                    // browser coord system is upside down.
           hypot      = Math.sqrt(diffX*diffX + diffY*diffY),
           angle      = Math.asin(diffY/hypot),
-          newHypot   = Math.max(rad*3/2, 30) + myR,
+          newHypot   = Math.max(rad*3/2, 30) + this.r,
           angleIncrements = [Math.PI/2, (-1)*Math.PI/2, Math.PI],
           newCenter, i, len, newX, newY, tmpAngle;
-
-      this.el.stop(); // stop any existing animation
 
       // Handle some ambiguous cases.
       if (diffX < 0 && diffY > 0) {
@@ -215,7 +224,7 @@ var NetworkGraph;
       else if (angle < 0 && diffX < 0 && diffY < 0) {
         angle = pi - angle;
       }
-      else if (myY === cy && diffX < 0) {
+      else if (this.cy === cy && diffX < 0) {
         angle = pi;
       }
 
@@ -226,7 +235,7 @@ var NetworkGraph;
       // Try going right 90 degrees, then left 90 degrees, then 180.
       i = 0;
       len = angleIncrements.length;
-      while (!GraphUtils.isInBounds(newX, newY, myR)) {
+      while (!GraphUtils.isInBounds(newX, newY, this.r)) {
         if (i >= len) {
           break;
         }
@@ -235,7 +244,7 @@ var NetworkGraph;
         newY     = cy + Math.sin(tmpAngle)*newHypot * (-1); // flip to right side up
       }
 
-      if (!GraphUtils.isInBounds(newX, newY, myR)) {
+      if (!GraphUtils.isInBounds(newX, newY, this.r)) {
         // Didn't find a new in-bounds position. This shouldn't happen.
         console.log('Couldn\'t find a in-bounds position to jump to!');
         // Last resort ... just find a random x,y to jump to
@@ -259,29 +268,18 @@ var NetworkGraph;
     // @circleList: list of elements against which to check for collisions
     moveOverlapCirclesProto: function(circleList) {
       // Check if any other circles have intersecting BBoxes.
-      var el     = this.el,
-          myId   = el.id,
-          myBBox = el.getBBox(),
-          rad    = el.attr('r') || this.IMG_DIM/2,
-          cx     = el.attr('cx') || el.attr('x') + rad,
-          cy     = el.attr('cy') || el.attr('y') + rad,
+      var self           = this,
           overlapCircles = [];
 
       circleList.forEach(function(circ) {
-        var bbox;
-
         // Don't compare the same circle to itself
-        if (circ.el.id !== myId) {
-          bbox = circ.el.getBBox();
-          if (Raphael.isBBoxIntersect(myBBox, bbox)) {
-            overlapCircles.push(circ);
-          }
+        if (circ !== self && GraphUtils.isIntersecting(self, circ)) {
+          overlapCircles.push(circ);
         }
       });
 
       overlapCircles.forEach(function(circ) {
-        circ.findOpenSpace(cx, cy, rad);
-        circ.el.toBack();
+        circ.findOpenSpace(self.cx, self.cy, self.r);
       });
     },
 
@@ -491,38 +489,32 @@ var NetworkGraph;
     },
 
     doHoverIn: function () {
-      var el = this.el;
-
-      if (isDragging) {
-        return;
-      }
-
-      this.label.show();
-
+      //if (isDragging) {
+        //return;
+      //}
       if (!isHighlighting) {
-        this.label.toFront();
-        this.el.toFront();
+        this.$container.addClass('hover');
         this.moveOverlapCircles();
       }
     },
 
     doHoverOut: function() {
-      this.label.hide();
+      if (!isHighlighting) {
+        this.$container.removeClass('hover');
+      }
     },
 
     doClick: function() {
-      if (this.clicked) {
-        if (isHighlighting && this != highlightedCirc) {
-          // Clicked on a circle, but another was highlighted.
-          // Unhighlight that one, then highlight this one.
-          highlightedCirc.unhighlight();
-        }
-        else {
-          isHighlighting = !isHighlighting;
-        }
-        highlightedCirc = this;
-        eve('circleClick', this);
+      if (isHighlighting && this != highlightedCirc) {
+        // Clicked on a circle, but another was highlighted.
+        // Unhighlight that one, then highlight this one.
+        highlightedCirc.unhighlight();
       }
+      else {
+        isHighlighting = !isHighlighting;
+      }
+      highlightedCirc = this;
+      eve('circleClick', this);
     },
 
     doDrag: function(dx, dy) {
@@ -669,19 +661,15 @@ var NetworkGraph;
                     radius,
                     cmpyName);
 
-      /*
-      this.el.hover(this.doHoverIn,
-                    this.doHoverOut,
-                    this,
-                    this)
-             .click(this.doClick, this)
-             .drag(this.doDrag,
-                   this.doDragStart,
-                   this.doDragStop,
-                   this,
-                   this,
-                   this);
-      */
+      this.$circle.hover(this.doHoverIn.bind(this),
+                         this.doHoverOut.bind(this))
+                  .drag(this.doDrag,
+                        this.doDragStart,
+                        this.doDragStop,
+                        this,
+                        this,
+                        this)
+                  //.click(this.doClick.bind(this));
 
       this.employees = cmpyEmployees;
 

@@ -1,12 +1,17 @@
 .circle-container {
   position: absolute;
 
-  &:hover .cmpy-label {
-    display: block;
+  &.hover{
+    z-index: 1000;
+
+    .cmpy-label {
+      display: block;
+    }
   }
   .transition-all;
 }
 .circle {
+  background-color: #fff;
   border: 1px solid #000;
   .transition-all;
 }
