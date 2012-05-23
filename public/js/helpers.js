@@ -4,7 +4,7 @@
  * Takes result from LinkedIn API and returns data values if there are any to
  * return.
  */
-var getData, output;
+var getData, extend, output;
 
 getData = function(data) {
   if (data && data.values && data.values.length) {
@@ -12,6 +12,18 @@ getData = function(data) {
   }
   return null;
 };
+
+// Adds properties of obj2 to obj1 and returns obj1.
+if (typeof extend === 'undefined') {
+  extend = function(obj1, obj2) {
+    for (prop in obj2) {
+      if (obj2.hasOwnProperty(prop)) {
+        obj1[prop] = obj2[prop];
+      }
+    }
+  }
+  return obj1;
+}
 
 // debug
 output = function(str) {
@@ -71,12 +83,3 @@ if (Function && Function.prototype && !Function.prototype.bind) {
   };
 }
 
-//if (typeof Object.extend === 'undefined') {
-  //Object.prototype.extend = function(extendObj) {
-    //for (prop in extendObj) {
-      //if (extendObj.hasOwnProperty(prop)) {
-        //this[prop] = extendObj[prop];
-      //}
-    //}
-  //}
-//}

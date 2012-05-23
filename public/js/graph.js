@@ -27,7 +27,8 @@ var NetworkGraph;
 
       cmpyCircles      = {}, // all company circles created up to this point
       cxnCircles       = {}, // all connection circles created up to this point
-      currCircles      = [], // the circles currently drawn in the viewport
+      currCmpys        = [], // the circles currently drawn in the viewport
+      currCxns         = [], // the circles currently drawn in the viewport
       isDragging       = false,
       isHighlighting   = false, // are we highlighting a circle?
       highlightedCirc,
@@ -35,9 +36,204 @@ var NetworkGraph;
       paper,
 
       GraphSliderBar,
+      NetworkCircle,
       ConnectionCircle,
       CompanyCircle,
       GraphUtils;
+
+  GraphUtils = {
+    // isInBounds
+    // ==========
+    // Returns if the circle is in bounds.
+    isInBounds: function(x, y, r) {
+      return this.xInBounds(x, r) && this.yInBounds(y, r);
+    },
+
+    xInBounds: function(x, r) {
+      return (x - r) > VIEWPORT_LEFT &&
+             (x + r) < VIEWPORT_RIGHT;
+    },
+
+    yInBounds: function(y, r) {
+      return (y - r) > VIEWPORT_TOP &&
+             (y + r) < VIEWPORT_BOTTOM;
+    },
+
+    // getRandomCenter
+    // ===============
+    // Returns random center coordinates that ensure the circle will be drawn
+    // completely within the boundaries of the canvas.
+    getRandomCenter: function(radius) {
+      var x      = Math.floor(Math.random()*(VIEWPORT_RIGHT-VIEWPORT_LEFT)) +
+                   VIEWPORT_PADDING,
+          y      = Math.floor(Math.random()*(BAR_TOP_Y - VIEWPORT_PADDING)) +
+                   VIEWPORT_PADDING;
+
+      return GraphUtils.moveAwayFromEdge(x, y, radius);
+    },
+
+    moveAwayFromEdge: function(x, y, r) {
+      var left   = x - r,
+          top    = y - r,
+          right  = left + 2*r,
+          bottom = top + 2*r;
+
+      if (left < VIEWPORT_PADDING) {
+        x = VIEWPORT_PADDING + r;
+      }
+      else if (right > VIEWPORT_RIGHT) {
+        x = PAPER_WIDTH - VIEWPORT_PADDING - r;
+      }
+      if (top < VIEWPORT_PADDING) {
+        y = VIEWPORT_PADDING + r;
+      }
+      else if (bottom > BAR_TOP_Y - VIEWPORT_PADDING) {
+        y = BAR_TOP_Y - VIEWPORT_PADDING - r;
+      }
+
+      return { x: x,
+               y: y };
+    }
+  };
+
+  NetworkCircle = function() {
+    // move
+    // ====
+    // Convenience method to move both the circle and the label
+    //
+    // @onComplete: callback to be invoked when animation is complete.
+    this.move = function(x, y, animate, onComplete) {
+      var circleType = this instanceof ConnectionCircle ? 'cxn' : 'cmpy',
+          el         = this.el,
+          coords;
+
+      if (circleType === 'cmpy') {
+        coords = { 'cx': x, 'cy': y };
+      }
+      else {
+        coords = { 'x': x - this.IMG_DIM/2, 'y': y - this.IMG_DIM/2 };
+      }
+
+      if (this.label) {
+        this.label.hide()
+                  .attr({ 'x': x,
+                          'y': y - el.attr('r') - 5 });
+      }
+
+      if (animate) {
+        el.animate(coords, ANIM_DURATION, 'ease-out', onComplete);
+      }
+      else {
+        el.attr(coords);
+      }
+    };
+
+    // findOpenSpace
+    // =============
+    // Moves a background circle out of the way of the currently highlighted
+    // circle.
+    //
+    // Thanks mathisfun.com for the trigonometry refresher!
+    // http://www.mathsisfun.com/sine-cosine-tangent.html
+    //
+    // @cx: center x of highlighted circle
+    // @cy: center y of highlighted circle
+    // @radius: radius of highlighted circle
+    this.findOpenSpace = function(cx, cy, rad) {
+      var el         = this.el,
+          pi         = Math.PI,
+          imgRad     = this.IMG_DIM ? this.IMG_DIM/2 : null,
+          myX        = el.attr('cx') || el.attr('x') + imgRad,
+          myY        = el.attr('cy') || el.attr('y') + imgRad,
+          myR        = el.attr('r')  || imgRad, // my radius
+          diffX      = myX - cx,     // adjacent
+          diffY      = cy - myY,     // opposite
+                                   // browser coord system is upside down.
+          hypot      = Math.sqrt(diffX*diffX + diffY*diffY),
+          angle      = Math.asin(diffY/hypot),
+          newHypot   = Math.max(rad*3/2, 30) + myR,
+          angleIncrements = [Math.PI/2, (-1)*Math.PI/2, Math.PI],
+          newCenter, i, len, newX, newY, tmpAngle;
+
+      this.el.stop(); // stop any existing animation
+
+      // Handle some ambiguous cases.
+      if (diffX < 0 && diffY > 0) {
+        angle = pi - angle;
+      }
+      else if (angle < 0 && diffX < 0 && diffY < 0) {
+        angle = pi - angle;
+      }
+      else if (myY === cy && diffX < 0) {
+        angle = pi;
+      }
+
+      newX = cx + Math.cos(angle)*newHypot;
+      newY = cy + Math.sin(angle)*newHypot * (-1); // flip to right side up
+
+      // Handle circle flying out of bounds.
+      // Try going right 90 degrees, then left 90 degrees, then 180.
+      i = 0;
+      len = angleIncrements.length;
+      while (!GraphUtils.isInBounds(newX, newY, myR)) {
+        if (i >= len) {
+          break;
+        }
+        tmpAngle = angle + angleIncrements[i++];
+        newX     = cx + Math.cos(tmpAngle)*newHypot,
+        newY     = cy + Math.sin(tmpAngle)*newHypot * (-1); // flip to right side up
+      }
+
+      if (!GraphUtils.isInBounds(newX, newY, myR)) {
+        // Didn't find a new in-bounds position. This shouldn't happen.
+        console.log('Couldn\'t find a in-bounds position to jump to!');
+        // Last resort ... just find a random x,y to jump to
+        newCenter = GraphUtils.getRandomCenter(myR);
+        newX = newCenter.x;
+        newY = newCenter.y;
+      }
+      else {
+        angle = tmpAngle;
+      }
+
+      this.move(newX, newY, true);
+    };
+
+    // moveOverlapCirclesProto
+    // =======================
+    // Detect other circles that overlap with this one, and move them!
+    // Intended to be curried by implementing classes.
+    //
+    //
+    // @circleList: list of elements against which to check for collisions
+    this.moveOverlapCirclesProto = function(circleList) {
+      // Check if any other circles have intersecting BBoxes.
+      var el     = this.el,
+          myId   = el.id,
+          myBBox = el.getBBox(),
+          rad    = el.attr('r') || this.IMG_DIM/2,
+          cx     = el.attr('cx') || el.attr('x') + rad,
+          cy     = el.attr('cy') || el.attr('y') + rad,
+          overlapCircles = [];
+
+      circleList.forEach(function(circ) {
+        var bbox;
+
+        // Don't compare the same circle to itself
+        if (circ.el.id !== myId) {
+          bbox = circ.el.getBBox();
+          if (Raphael.isBBoxIntersect(myBBox, bbox)) {
+            overlapCircles.push(circ);
+          }
+        }
+      });
+
+      overlapCircles.forEach(function(circ) {
+        circ.findOpenSpace(cx, cy, rad);
+        circ.el.toBack();
+      });
+    };
+  };
 
   GraphSliderBar = function() {
     var mouseDownX, newMouseX, bar, knob,
@@ -87,17 +283,76 @@ var NetworkGraph;
     this.init(profile, cx, cy);
   };
 
-  ConnectionCircle.prototype = {
+  ConnectionCircle.prototype = new NetworkCircle();
+
+  extend(ConnectionCircle.prototype, {
     IMG_DIM: 80,
 
     init: function(profile, cx, cy) {
       var imgDim = this.IMG_DIM,
-          x = cx - imgDim/2,
-          y = cy - imgDim/2;
+          center = GraphUtils.getRandomCenter(imgDim/2),
+          x      = center.x - imgDim/2,
+          y      = center.y - imgDim/2;
 
       this.el = paper.rect(x, y, imgDim, imgDim, imgDim/2)
                      .attr({ 'fill': 'url(' + profile.pictureUrl + ')' })
-                     .hide();
+                     .hide()
+                     .drag(this.doDrag,
+                           this.doDragStart,
+                           this.doDragStop,
+                           this,
+                           this,
+                           this)
+                     .hover(this.doHoverIn,
+                            this.doHoverOut,
+                            this,
+                            this);
+    },
+
+    doDrag: function(dx, dy) {
+      var newX, newY, el;
+      if (isDragging) {
+        el = this.el;
+        newX = this.mouseDownX + dx;
+        newY = this.mouseDownY + dy;
+        if (this.xInBounds(newX)) {
+          el.attr({ 'x': newX });
+        }
+        if (this.yInBounds(newY)) {
+          el.attr({ 'y': newY });
+        }
+      }
+    },
+
+    doDragStart: function() {
+      var el = this.el;
+
+      this.mouseDownX = el.attr('x');
+      this.mouseDownY = el.attr('y');
+
+      isDragging = true;
+      el.stop();
+    },
+
+    doDragStop: function() {
+      if (isDragging) {
+        this.moveOverlapCircles();
+        isDragging = false;
+      }
+    },
+
+    doHoverIn: function() {
+      var el = this.el;
+
+      if (isDragging) {
+        return;
+      }
+
+      this.el.toFront();
+      this.moveOverlapCircles();
+    },
+
+    doHoverOut: function() {
     },
 
     setCenter: function(cx, cy) {
@@ -108,6 +363,31 @@ var NetworkGraph;
       this.el.attr({ 'x': x, 'y': y });
     },
 
+    xInBounds: function(x) {
+      var midCircR = highlightedCirc.el.attr('r'),
+          inBounds = (x >= VIEWPORT_LEFT &&
+                      x + this.IMG_DIM <= VIEWPORT_RIGHT);
+
+      return inBounds && (x + this.IMG_DIM <= VIEWPORT_MID_X - midCircR &&
+                          x <= VIEWPORT_MID_X + midCircR);
+    },
+
+    yInBounds: function(y) {
+      var midCircR = highlightedCirc.el.attr('r'),
+          inBounds = (y >= VIEWPORT_TOP &&
+                      y + this.IMG_DIM <= VIEWPORT_BOTTOM);
+
+      return inBounds && (y + this.IMG_DIM <= VIEWPORT_MID_Y - midCircR ||
+                          y <= VIEWPORT_MID_Y + midCircR);
+    },
+
+    // Curries the NetworkCircle.moveOverlapCircles function with currCxns
+    // (specifies that we want to compare this circle against other cxn circles)
+    moveOverlapCircles: function() {
+      return this.moveOverlapCirclesProto.call(this, currCxns);
+    },
+
+
     hide: function() {
       this.el.hide();
     },
@@ -115,13 +395,15 @@ var NetworkGraph;
     show: function() {
       this.el.show();
     }
-  };
+  });
 
   CompanyCircle = function(cmpyEmployees, cmpyName) {
     this.init(cmpyEmployees, cmpyName);
   };
 
-  CompanyCircle.prototype = {
+  CompanyCircle.prototype = new NetworkCircle();
+
+  extend(CompanyCircle.prototype, {
     calculateCmpyRadius: function(cmpySize) {
       // Formula: y = -15000/(x+100) + 150
       // http://www.mathsisfun.com/data/function-grapher.php
@@ -142,123 +424,10 @@ var NetworkGraph;
       return this;
     },
 
-    // move
-    // ====
-    // Convenience method to move both the circle and the label
-    //
-    // @onComplete: callback to be invoked when animation is complete.
-    move: function(x, y, animate, onComplete) {
-      var coords = { 'cx': x, 'cy': y },
-          el     = this.el;
-      this.label.hide();
-      if (animate) {
-        el.animate(coords, ANIM_DURATION, 'ease-out', onComplete);
-      }
-      else {
-        el.attr(coords);
-      }
-      this.label.attr({
-                        'x': x,
-                        'y': y - el.attr('r') - 5
-                      });
-    },
-
-    // findOpenSpace
-    // =============
-    // Moves a background circle out of the way of the currently highlighted
-    // circle.
-    //
-    // Thanks mathisfun.com for the trigonometry refresher!
-    // http://www.mathsisfun.com/sine-cosine-tangent.html
-    //
-    // @cx: center x of highlighted circle
-    // @cy: center y of highlighted circle
-    // @radius: radius of highlighted circle
-    findOpenSpace: function(cx, cy, rad) {
-      var el       = this.el,
-          pi       = Math.PI,
-          myX      = el.attr('cx'),
-          myY      = el.attr('cy'),
-          myR      = el.attr('r'), // my radius
-          diffX    = myX - cx,     // adjacent
-          diffY    = cy - myY,     // opposite
-                                   // browser coord system is upside down.
-          hypot    = Math.sqrt(diffX*diffX + diffY*diffY),
-          angle    = Math.asin(diffY/hypot),
-          newHypot = Math.max(rad*3/2, 30) + myR,
-          angleIncrements = [Math.PI/2, (-1)*Math.PI/2, Math.PI],
-          newCenter, i, len, newX, newY, tmpAngle;
-
-      this.el.stop(); // stop any existing animation
-
-      // Handle some ambiguous cases.
-      if (diffX < 0 && diffY > 0) {
-        angle = pi - angle;
-      }
-      else if (angle < 0 && diffX < 0 && diffY < 0) {
-        angle = pi - angle;
-      }
-      else if (myY === cy && diffX < 0) {
-        angle = pi;
-      }
-
-      newX     = cx + Math.cos(angle)*newHypot,
-      newY     = cy + Math.sin(angle)*newHypot * (-1); // flip to right side up
-
-      // Handle circle flying out of bounds.
-      // Try going right 90 degrees, then left 90 degrees, then 180.
-      i = 0;
-      len = angleIncrements.length;
-      while (!GraphUtils.isInBounds(newX, newY, myR)) {
-        if (i >= len) {
-          break;
-        }
-        tmpAngle = angle + angleIncrements[i++];
-        newX     = cx + Math.cos(tmpAngle)*newHypot,
-        newY     = cy + Math.sin(tmpAngle)*newHypot * (-1); // flip to right side up
-      }
-
-      if (!GraphUtils.isInBounds(newX, newY, myR)) {
-        // Didn't find a new in-bounds position. This shouldn't happen.
-        console.log('Couldn\'t find a in-bounds position to jump to!');
-        // Last resort ... just find a random x,y to jump to
-        newCenter = GraphUtils.getRandomCenter(myR);
-        newX = newCenter.x;
-        newY = newCenter.y;
-      }
-      else {
-        angle = tmpAngle;
-      }
-
-      this.move(newX, newY, true);
-    },
-
-    // moveOverlapCircles
-    // ==================
-    // Detect other circles that overlap with this one, and move them!
+    // Curries the NetworkCircle.moveOverlapCircles function with currCmpys
+    // (specifies that we want to compare this circle against other cmpy circles)
     moveOverlapCircles: function() {
-      // Check if any other circles have intersecting BBoxes.
-      var overlapCircles = [],
-          el             = this.el,
-          myId           = el.id,
-          myBBox         = el.getBBox();
-
-      currCircles.forEach(function(circ) {
-        var bbox;
-
-        // Don't compare the same circle to itself
-        if (circ.el.id !== myId) {
-          bbox = circ.el.getBBox();
-          if (Raphael.isBBoxIntersect(myBBox, bbox)) {
-            overlapCircles.push(circ);
-          }
-        }
-      });
-
-      overlapCircles.forEach(function(circ) {
-        circ.findOpenSpace(el.attr('cx'), el.attr('cy'), el.attr('r'));
-        circ.el.toBack();
-      });
+      return this.moveOverlapCirclesProto.call(this, currCmpys);
     },
 
     // setEmployees
@@ -292,7 +461,7 @@ var NetworkGraph;
     },
 
     doHoverIn: function () {
-      var el     = this.el;
+      var el = this.el;
 
       if (isDragging) {
         return;
@@ -309,7 +478,6 @@ var NetworkGraph;
 
     doHoverOut: function() {
       this.label.hide();
-      collidingCircles = [];
     },
 
     doClick: function() {
@@ -390,7 +558,6 @@ var NetworkGraph;
     loadEmployees: function() {
       var self         = this,
           idx          = 0,
-          ringNum      = 0, // concentric circles around which to position pictures
           pi           = Math.PI,
           cmpyR        = this.el.attr('r'),
           i, len;
@@ -398,15 +565,12 @@ var NetworkGraph;
       this.employees.forEach(function(empId) {
         var profile     = profileData[empId],
             IMG_DIM     = 80,
-            ringRadius  = cmpyR + 10 + ringNum*IMG_DIM + IMG_DIM/2,
-            cxnCircle, angles, center, cx, cy;
+            cxnCircle;
 
         if (profile.pictureUrl) {
-
           cxnCircle = cxnCircles[profile.id];
           if (!cxnCircle) {
-            center = GraphUtils.getRandomCenter(IMG_DIM),
-            cxnCircle = new ConnectionCircle(profile, center.x, center.y);
+            cxnCircle = new ConnectionCircle(profile);
             cxnCircles[profile.id] = cxnCircle;
           }
           self.pictures.push(cxnCircle);
@@ -420,6 +584,7 @@ var NetworkGraph;
     showEmployees: function() {
       this.pictures.forEach(function(cxnCirc) {
         cxnCirc.show();
+        currCxns.push(cxnCirc);
       });
     },
 
@@ -447,6 +612,7 @@ var NetworkGraph;
         this.pictures.forEach(function(cxnCirc) {
           cxnCirc.hide();
         });
+        currCxns = [];
       }
     },
 
@@ -496,7 +662,7 @@ var NetworkGraph;
 
       eve.on('circleClick', this.handleClick);
     }
-  };
+  });
 
   NetworkGraph = function() {
     this.init();
@@ -518,7 +684,7 @@ var NetworkGraph;
         cmpyCircles[cmpyId].hide();
       }
 
-      currCircles = [];
+      currCmpys = [];
 
       // Debug
       $('#output').text("Num companies: " + Object.keys(companies).length);
@@ -537,14 +703,14 @@ var NetworkGraph;
           cmpyCircles[cmpyId] = cmpyCircle;
         }
 
-        currCircles.push(cmpyCircle);
+        currCmpys.push(cmpyCircle);
       }
     },
 
     fadeOtherCircles: function() {
       var self = this; // "this" is bound to circle that was clicked.
 
-      currCircles.forEach(function(circ) {
+      currCmpys.forEach(function(circ) {
         if (circ.el.id !== self.el.id) {
           if (isHighlighting) {
             circ.el.hide();
@@ -559,60 +725,5 @@ var NetworkGraph;
     setProfiles: function(profiles) {
       profileData = profiles;
     }
-  };
-
-  GraphUtils = {
-    // isInBounds
-    // ==========
-    // Returns if the circle is in bounds.
-    isInBounds: function(x, y, r) {
-      return this.xInBounds(x, r) && this.yInBounds(y, r);
-    },
-
-    xInBounds: function(x, r) {
-      return (x - r) > VIEWPORT_LEFT &&
-             (x + r) < VIEWPORT_RIGHT;
-    },
-
-    yInBounds: function(y, r) {
-      return (y - r) > VIEWPORT_TOP &&
-             (y + r) < VIEWPORT_BOTTOM;
-    },
-
-    // getRandomCenter
-    // ===============
-    // Returns random center coordinates that ensure the circle will be drawn
-    // completely within the boundaries of the canvas.
-    getRandomCenter: function(radius) {
-      var x      = Math.floor(Math.random()*(VIEWPORT_RIGHT-VIEWPORT_LEFT)) +
-                   VIEWPORT_PADDING,
-          y      = Math.floor(Math.random()*(BAR_TOP_Y - VIEWPORT_PADDING)) +
-                   VIEWPORT_PADDING;
-
-      return GraphUtils.moveAwayFromEdge(x, y, radius);
-    },
-
-    moveAwayFromEdge: function(x, y, r) {
-      var left   = x - r,
-          top    = y - r,
-          right  = left + 2*r,
-          bottom = top + 2*r;
-
-      if (left < VIEWPORT_PADDING) {
-        x = VIEWPORT_PADDING + r;
-      }
-      else if (right > VIEWPORT_RIGHT) {
-        x = PAPER_WIDTH - VIEWPORT_PADDING - r;
-      }
-      if (top < VIEWPORT_PADDING) {
-        y = VIEWPORT_PADDING + r;
-      }
-      else if (bottom > BAR_TOP_Y - VIEWPORT_PADDING) {
-        y = BAR_TOP_Y - VIEWPORT_PADDING - r;
-      }
-
-      return { x: x,
-               y: y };
-    },
   };
 })();
