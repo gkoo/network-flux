@@ -96,37 +96,88 @@ var NetworkGraph;
     }
   };
 
-  NetworkCircle = function() {
+  NetworkCircle = function() {};
+
+  NetworkCircle.prototype = {
+    createEl: function(id, x, y, r, name) {
+      this.cx = x;
+      this.cy = y;
+      this.r = r;
+      this.$circle = $('<div>').addClass('circle cmpy-circ')
+                           .css({
+                             width: r*2,
+                             height: r*2
+                           });
+      this.setBorderRadius(r);
+      this.$label = $('<span>').addClass('cmpy-label')
+                               .text(name);
+      this.$container = $('<div>').addClass('circle-container cmpy-circ-container')
+                                  .attr('id', 'circle-'+id)
+                                  .append(this.$circle, this.$label)
+                                  .css({
+                                    left: this.cx-r,
+                                    top:  this.cy-r
+                                  });
+    },
+
+    setBorderRadius: function(r) {
+      var r2 = r*2;
+      this.$circle.css({
+        '-moz-border-radius':    r2 + 'px',
+        '-ms-border-radius':     r2 + 'px',
+        '-o-border-radius':      r2 + 'px',
+        '-webkit-border-radius': r2 + 'px',
+        'border-radius':         r2 + 'px'
+      });
+    },
+
+    show: function() {
+      this.$container.show();
+      return this;
+    },
+
+    hide: function() {
+      this.$container.hide();
+      return this;
+    },
+
     // move
     // ====
     // Convenience method to move both the circle and the label
-    //
-    // @onComplete: callback to be invoked when animation is complete.
-    this.move = function(x, y, animate, onComplete) {
-      var circleType = this instanceof ConnectionCircle ? 'cxn' : 'cmpy',
-          el         = this.el,
-          coords;
+    move: function(cx, cy, animate) {
+      var $circle = this.$circle,
+          coords  = { left: cx - this.r, top: cy - this.r };
 
-      if (circleType === 'cmpy') {
-        coords = { 'cx': x, 'cy': y };
-      }
-      else {
-        coords = { 'x': x - this.IMG_DIM/2, 'y': y - this.IMG_DIM/2 };
+      this.cx = cx;
+      this.cy = cy;
+
+      if (this.$label) {
+        this.$label.hide();
       }
 
-      if (this.label) {
-        this.label.hide()
-                  .attr({ 'x': x,
-                          'y': y - el.attr('r') - 5 });
-      }
+      this.$container.css(coords);
+      return this;
+    },
 
-      if (animate) {
-        el.animate(coords, ANIM_DURATION, 'ease-out', onComplete);
-      }
-      else {
-        el.attr(coords);
-      }
-    };
+    setRadius: function(r) {
+      var newX = this.cx - r,
+          newY = this.cy - r,
+          diam = 2*r;
+
+      this.$container.css({
+        left: newX,
+        top:  newY
+      });
+      this.$circle.css({
+        width: diam,
+        height: diam
+      });
+
+      this.r = r;
+      this.setBorderRadius(r);
+
+      return this;
+    },
 
     // findOpenSpace
     // =============
@@ -139,7 +190,7 @@ var NetworkGraph;
     // @cx: center x of highlighted circle
     // @cy: center y of highlighted circle
     // @radius: radius of highlighted circle
-    this.findOpenSpace = function(cx, cy, rad) {
+    findOpenSpace: function(cx, cy, rad) {
       var el         = this.el,
           pi         = Math.PI,
           imgRad     = this.IMG_DIM ? this.IMG_DIM/2 : null,
@@ -197,7 +248,7 @@ var NetworkGraph;
       }
 
       this.move(newX, newY, true);
-    };
+    },
 
     // moveOverlapCirclesProto
     // =======================
@@ -206,7 +257,7 @@ var NetworkGraph;
     //
     //
     // @circleList: list of elements against which to check for collisions
-    this.moveOverlapCirclesProto = function(circleList) {
+    moveOverlapCirclesProto: function(circleList) {
       // Check if any other circles have intersecting BBoxes.
       var el     = this.el,
           myId   = el.id,
@@ -232,48 +283,37 @@ var NetworkGraph;
         circ.findOpenSpace(cx, cy, rad);
         circ.el.toBack();
       });
-    };
+    },
+
+    getContainer: function() {
+      return this.$container;
+    }
   };
 
   GraphSliderBar = function() {
-    var mouseDownX, newMouseX, bar, knob,
+    var $handle,
 
-    handleKnobDrag = function(dx) {
-      newX = mouseDownX + dx;
-      if (newX >= BAR_LEFT_BOUND && newX <= BAR_RIGHT_BOUND) {
-        newMouseX = newX;
-        knob.attr({ 'cx': newX });
-      }
-    },
-
-    handleKnobDragStart = function(x, y, evt) {
-      mouseDownX = knob.attr('cx');
+    handleDragStart = function(evt, ui) {
       if (isHighlighting && highlightedCirc) {
         isHighlighting = false;
-        eve('circleClick', highlightedCirc);
+        $.trigger('circleClick', highlightedCirc);
       }
     },
 
-    handleKnobDragStop = function(x, y, evt) {
-      eve('slide', this, Math.floor((newMouseX-BAR_LEFT_BOUND)/BAR_WIDTH * 100));
+    handleDragStop = function(evt, ui) {
+      var percent = Math.floor(ui.position.left/(PAPER_WIDTH - 2*KNOB_RADIUS)*100);
+      $(window).trigger('slider', percent);
     },
 
     init = function() {
-      bar = paper.rect(BAR_LEFT_BOUND, // top left x
-                       BAR_TOP_Y,      // top left y
-                       BAR_WIDTH,      // width
-                       BAR_THICKNESS); // height
-      bar.fill('#000');
-
-      knob = paper.circle(KNOB_RADIUS*3/2 + BAR_WIDTH,  // center x
-                          BAR_CENTER_Y,  // center y
-                          KNOB_RADIUS); // radius
-
-      knob.fill('#f00');
-
-      knob.drag(handleKnobDrag,
-                handleKnobDragStart,
-                handleKnobDragStop);
+      this.$el = $('#slider');
+      $handle = this.$el.find('#sliderHandle');
+      $handle.draggable({
+        axis: 'x',
+        containment: 'parent',
+        start: handleDragStart,
+        stop: handleDragStop,
+      });
     };
 
     init();
@@ -397,8 +437,8 @@ var NetworkGraph;
     }
   });
 
-  CompanyCircle = function(cmpyEmployees, cmpyName) {
-    this.init(cmpyEmployees, cmpyName);
+  CompanyCircle = function(id, cmpyEmployees, cmpyName) {
+    this.init(id, cmpyEmployees, cmpyName);
   };
 
   CompanyCircle.prototype = new NetworkCircle();
@@ -413,17 +453,6 @@ var NetworkGraph;
       return Math.max(radius, 10);
     },
 
-    show: function() {
-      this.el.show();
-      return this;
-    },
-
-    hide: function() {
-      this.el.hide();
-      this.label.hide();
-      return this;
-    },
-
     // Curries the NetworkCircle.moveOverlapCircles function with currCmpys
     // (specifies that we want to compare this circle against other cmpy circles)
     moveOverlapCircles: function() {
@@ -434,24 +463,25 @@ var NetworkGraph;
     // ============
     // Resizes the circle based on the number of employees.
     setEmployees: function(employees) {
-      var el = this.el,
-          oldRadius = el.attr('r'),
+      var oldRadius = this.r,
           newRadius = this.calculateCmpyRadius(employees.length),
-          oldLabelY = this.label.attr('y'),
-          x = el.attr('cx'),
-          y = el.attr('cy'),
+          cx = this.cx,
+          cy = this.cy,
           point;
 
       this.employees = employees;
       this.pictures = [];
 
       // recheck bounds when resizing circle
-      if (!GraphUtils.isInBounds(x, y, newRadius)) {
-        point = GraphUtils.moveAwayFromEdge(x, y, newRadius);
-        x = point.x;
-        y = point.y;
+      if (!GraphUtils.isInBounds(cx, cy, newRadius)) {
+        point = GraphUtils.moveAwayFromEdge(cx, cy, newRadius);
+        cx = point.x;
+        cy = point.y;
       }
-      el.animate({ 'cx': x, 'cy': y, 'r': newRadius }, ANIM_DURATION, 'ease-out', this.resetLabelPosition.bind(this));
+
+      this.move(cx, cy, true)
+          .setRadius(newRadius);
+
       return this;
     },
 
@@ -617,33 +647,29 @@ var NetworkGraph;
     },
 
     handleClick: function() {
-      if (isHighlighting) {
-        this.highlight();
-      }
-      else {
-        this.unhighlight();
-      }
+      alert('circleclick');
+      //if (isHighlighting) {
+        //this.highlight();
+      //}
+      //else {
+        //this.unhighlight();
+      //}
     },
 
-    init: function(cmpyEmployees, cmpyName) {
+    init: function(id, cmpyEmployees, cmpyName) {
       var radius = this.calculateCmpyRadius(cmpyEmployees.length),
           coords = GraphUtils.getRandomCenter(radius),
           x      = coords.x,
           y      = coords.y,
           self   = this;
 
-      this.el  = paper.circle(x, // center x
-                              y, // center y
-                              radius)
-                      .fill('#fff')
-                      .data('size', cmpyEmployees.length)
-                      .data('cx', x)
-                      .data('cy', y);
+      this.createEl(id,
+                    x, // center x
+                    y, // center y
+                    radius,
+                    cmpyName);
 
-      this.label = paper.text(x, y-radius-5, cmpyName)
-                        .fill('#000')
-                        .hide();
-
+      /*
       this.el.hover(this.doHoverIn,
                     this.doHoverOut,
                     this,
@@ -655,12 +681,13 @@ var NetworkGraph;
                    this,
                    this,
                    this);
+      */
 
       this.employees = cmpyEmployees;
 
       this.pictures = [];
 
-      eve.on('circleClick', this.handleClick);
+      //$.on('circleClick', this.handleClick);
     }
   });
 
@@ -670,11 +697,12 @@ var NetworkGraph;
 
   NetworkGraph.prototype = {
     init: function() {
-      paper = new Raphael(document.getElementById('canvas-container'), PAPER_WIDTH, PAPER_HEIGHT);
       this.sliderBar = new GraphSliderBar();
 
-      eve.on('circleClick', this.fadeOtherCircles);
+      //eve.on('circleClick', this.fadeOtherCircles);
     },
+
+    $viewport: $('#viewport'),
 
     renderCompanies: function(companies, cmpyNames) {
       var cmpyCircle, x, y, radius;
@@ -694,13 +722,13 @@ var NetworkGraph;
 
         // If the company circle already exists, just show it.
         if (cmpyCircle) {
-          cmpyCircle.show()
-                    .setEmployees(companies[cmpyId]);
+          cmpyCircle.show().setEmployees(companies[cmpyId]);
         }
         // It didn't exist. Create it.
         else {
-          cmpyCircle = new CompanyCircle(companies[cmpyId], cmpyNames[cmpyId]);
+          cmpyCircle = new CompanyCircle(cmpyId, companies[cmpyId], cmpyNames[cmpyId]);
           cmpyCircles[cmpyId] = cmpyCircle;
+          this.$viewport.append(cmpyCircle.getContainer());
         }
 
         currCmpys.push(cmpyCircle);

@@ -16,7 +16,7 @@ $(function() {
   var myProfile,
       cxnProfiles,
       allProfiles,
-      DO_PROCESSING = true,
+      DO_PROCESSING = 1,
       currCompanies = {},
       graph = new NetworkGraph(),
       today = (new Date()).getTime(),
@@ -32,7 +32,7 @@ $(function() {
    * ===========
    * Render the network graph at a point in time based on the given percentage.
    */
-  getSnapshot = function(percent) {
+  getSnapshot = function(evt, percent) {
     var targetDate = earliestDate + (timespan * percent/100);
     currCompanies = {};
     $('#debug').text(new Date(targetDate));
@@ -96,11 +96,7 @@ $(function() {
   },
 
   init = function() {
-    if (!Raphael.svg) {
-      // TODO: handle this more elegantly.
-      throw 'SVG not supported.';
-    }
-    eve.on('slide', getSnapshot);
+    $(window).bind('slider', getSnapshot);
 
     snapshotWorker = new Worker('js/snapshotWorker.js');
     snapshotWorker.addEventListener('message', function(evt) {

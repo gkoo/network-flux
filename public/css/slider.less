@@ -1,0 +1,17 @@
+#slider {
+  background-color: #000;
+  height: @barThickness;
+  overflow: visible;
+  position: relative;
+}
+
+#sliderHandle {
+  background-color: #f00;
+  width:  @knobRadius*2;
+  height: @knobRadius*2;
+
+  position: absolute;
+  top: @barThickness/2 - @knobRadius;
+
+  .border-radius(@knobRadius);
+}
