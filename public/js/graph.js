@@ -310,15 +310,15 @@ var NetworkGraph;
     },
 
     doDrag: function(dx, dy) {
-      var newX, newY, el;
+      var newX, newY, el, imgRadius = this.IMG_DIM/2;
       if (isDragging) {
         el = this.el;
         newX = this.mouseDownX + dx;
         newY = this.mouseDownY + dy;
-        if (this.xInBounds(newX)) {
+        if (GraphUtils.xInBounds(newX + imgRadius, imgRadius)) {
           el.attr({ 'x': newX });
         }
-        if (this.yInBounds(newY)) {
+        if (GraphUtils.yInBounds(newY + imgRadius, imgRadius)) {
           el.attr({ 'y': newY });
         }
       }
@@ -407,7 +407,7 @@ var NetworkGraph;
     calculateCmpyRadius: function(cmpySize) {
       // Formula: y = -15000/(x+100) + 150
       // http://www.mathsisfun.com/data/function-grapher.php
-      var radius = 150 - (15000/(cmpySize+100))
+      var radius = 100 - (1000/(cmpySize+10))
 
       // Want radius to be minimum of 10
       return Math.max(radius, 10);
@@ -567,6 +567,7 @@ var NetworkGraph;
             IMG_DIM     = 80,
             cxnCircle;
 
+        //output(profile.firstName + ' ' + profile.lastName);
         if (profile.pictureUrl) {
           cxnCircle = cxnCircles[profile.id];
           if (!cxnCircle) {
