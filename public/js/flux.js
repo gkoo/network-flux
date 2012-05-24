@@ -17,7 +17,6 @@ $(function() {
       cxnProfiles,
       allProfiles,
       DO_PROCESSING = 1,
-      currCompanies = {},
       graph = new NetworkGraph(),
       today = (new Date()).getTime(),
       allCmpyEmployees,
@@ -34,7 +33,6 @@ $(function() {
    */
   getSnapshot = function(evt, percent) {
     var targetDate = earliestDate + (timespan * percent/100);
-    currCompanies = {};
     $('#debug').text(new Date(targetDate));
     snapshotDate = new Date();
     snapshotWorker.postMessage({ allCmpyEmployees: allCmpyEmployees,
@@ -62,7 +60,6 @@ $(function() {
     date = new Date();
 
     cxnWorker = new Worker('js/cxnWorker.js');
-    cxnWorker.postMessage({ profiles: allProfiles });
     cxnWorker.addEventListener('message', function(evt) {
       if (evt.data) {
         allCmpyEmployees = evt.data.companies;
@@ -79,6 +76,8 @@ $(function() {
         }
       }
     }, false);
+
+    cxnWorker.postMessage({ profiles: allProfiles });
   },
 
   handleOwnProfile = function(data) {
@@ -95,19 +94,30 @@ $(function() {
     }
   },
 
+  debug = function() {
+    $('#circle-Stanford-University').find('.cmpy-circ').css({
+      width: '30px',
+      height: '30px',
+      'background-color': '#f00'
+    });
+  },
+
   init = function() {
     $(window).bind('slider', getSnapshot);
 
     snapshotWorker = new Worker('js/snapshotWorker.js');
     snapshotWorker.addEventListener('message', function(evt) {
-      var date = new Date();
-      currCompanies = evt.data ? evt.data.currCompanies : null;
+      var date = new Date(),
+          currCompanies = evt.data ? evt.data.currCompanies : null;
+
       if (currCompanies) {
         graph.renderCompanies(currCompanies, cmpyNames);
         // no-op takes around 70-100 ms
         console.log('Processing took ' + (date.getTime() - snapshotDate.getTime()) + ' milliseconds');
       }
     }, false);
+
+    $('#debugBtn').click(debug);
   },
 
   onLinkedInAuth = function() {

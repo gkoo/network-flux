@@ -9,14 +9,25 @@ body {
 }
 
 #paper {
-  border: 1px solid #000;
   width: @paperWidth*1px;
   height: @paperHeight*1px;
   .center;
 }
 
 #viewport {
-  margin: @viewportPadding @viewportPadding 0 @viewportPadding;
+  margin: @viewportPadding;
   height: @viewportHeight;
   position: relative;
+  text-align: center;
+}
+
+#connections {
+  max-height: @viewportHeight - @highlightRadius;
+  position: absolute;
+  left: 0;
+  top: @highlightRadius*2;
+}
+
+.cxn-circ-container {
+  display: none;
 }

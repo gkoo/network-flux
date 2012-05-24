@@ -10,10 +10,18 @@
   border-radius:         @radius;
 }
 
-.transition-all (@duration: .5s, @easing: ease-out) {
+.transition-all (@duration: @animDuration, @easing: ease-out) {
   -moz-transition:    all @duration @easing;
   -ms-transition:     all @duration @easing;
   -o-transition:      all @duration @easing;
   -webkit-transition: all @duration @easing;
   transition:         all @duration @easing;
+}
+
+.transition-none () {
+  -moz-transition:    all 0s;
+  -ms-transition:     all 0s;
+  -o-transition:      all 0s;
+  -webkit-transition: all 0s;
+  transition:;
 }

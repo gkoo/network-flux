@@ -1,19 +1,19 @@
 @paperWidth      : 950px;
-@paperHeight     : 600;
+@paperHeight     : 750px;
 
-@knobRadius      : 20;
+@knobRadius      : 20px;
 
 // Coords for the playbar.
 @barWidth        : @paperWidth - @knobRadius*3;
 @barThickness    : 10px;
-@barCenterY      : @paperHeight - 55;
+@barCenterY      : @paperHeight - 55px;
 @barTopY         : @barCenterY - (@barThickness/2);
 @barLeftBound    : @knobRadius * 3/2;
 @barRightBound   : @knobRadius * 3/2 + @barWidth;
 
 // Bounding box for canvas viewport (where the circles are allowed to go)
 @viewportPadding : 30px;
-@viewportHeight  : 540px;
+@viewportHeight  : @barCenterY + @barThickness/2 - @knobRadius/2 - @viewportPadding;
 @viewportTop     : @viewportPadding;
 @viewportLeft    : @viewportPadding;
 @viewportRight   : @paperWidth - @viewportPadding;
@@ -21,4 +21,5 @@
 @viewportMidX    : @viewportPadding + (@viewportRight - @viewportLeft)/2;
 @viewportMidY    : @viewportPadding + (@viewportBottom - @viewportTop)/2;
 
-@animDuration    : 500;
+@highlightRadius : 40px;
+@animDuration    : .5s;

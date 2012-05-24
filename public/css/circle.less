@@ -1,5 +1,15 @@
+.highlighting {
+  .cxn-circ-container {
+    display: block;
+  }
+}
+
 .circle-container {
-  position: absolute;
+  .transition-all;
+
+  &.cmpy-circ-container {
+    position: absolute;
+  }
 
   &.hover{
     z-index: 1000;
@@ -8,14 +18,43 @@
       display: block;
     }
   }
-  .transition-all;
+
+  &.ui-draggable-dragging {
+    z-index: 1000;
+
+    .transition-none;
+
+    .cmpy-label {
+      display: none;
+    }
+  }
+
+  &.highlighted .cmpy-circ {
+    background-color: #fff;
+  }
 }
+
 .circle {
-  background-color: #fff;
   border: 1px solid #000;
   .transition-all;
 }
 
+.cmpy-circ {
+  background-color: #eee;
+}
+
+.cxn-circ {
+  overflow: hidden;
+}
+
 .cmpy-label {
+  display: none;
+}
+
+.cxn-label {
+  display: none;
+}
+
+.cxn-circ-container {
   display: none;
 }
