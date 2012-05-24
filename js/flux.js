@@ -166,7 +166,7 @@ $(function() {
   };
 
   onLinkedInLoad = function() {
-    GordonUtils.fadeIn($signinEl);
+    GordonUtils.fadeIn($('#signin, #title'));
     IN.Event.on(IN, "auth", onLinkedInAuth);
   };
 

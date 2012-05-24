@@ -1,0 +1,79 @@
+.pointer-cursor() {
+  cursor: pointer;
+  cursor: hand;
+}
+
+.highlighting {
+  .cxn-circ-container {
+    display: block;
+  }
+}
+
+.circle-container {
+  .transition-all;
+
+
+  &.hover{
+    z-index: 1000;
+
+    .cmpy-label {
+      display: block;
+    }
+  }
+
+  &.ui-draggable-dragging {
+    z-index: 1000;
+
+    .transition-none;
+
+    .cmpy-label {
+      display: none;
+    }
+  }
+
+  &.highlighted .cmpy-circ {
+    background-color: #fff;
+  }
+}
+
+.cmpy-circ-container {
+  .pointer-cursor;
+  position: absolute;
+}
+
+.circle {
+  border: 1px solid #000;
+  .transition-all;
+}
+
+.cmpy-circ {
+  background-color: #eee;
+  position: relative;
+}
+
+.cxn-circ {
+  overflow: hidden;
+}
+
+.cmpy-label {
+  display: none;
+  font-size: 12px;
+  min-width: 200px;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.cxn-label {
+  display: none;
+}
+
+.cxn-circ-container {
+  display: none;
+}
+
+.backBtn {
+  position: absolute;
+  top: @highlightRadius - 10px;
+  left: 21px;
+}

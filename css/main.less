@@ -1,0 +1,98 @@
+body {
+  font-family: 'Cantata One', Georgia, serif;
+  text-align: center;
+}
+
+#title {
+  .hide-opacity;
+  float: left;
+  margin: 0;
+  padding: 0;
+  text-align: left;
+  .transition(opacity, 1s);
+
+  h1 {
+    font-size: 36px;
+    margin: 20px 0;
+    padding: 0;
+  }
+}
+
+#paper {
+  width: @paperWidth*1px;
+  height: @paperHeight*1px;
+  .center;
+}
+
+#signin {
+  .hide-opacity;
+  clear: both;
+  padding-top: 200px;
+  .transition(opacity, 1s);
+}
+
+#share {
+  float: right;
+  margin: 25px 0;
+  padding: 0;
+  .hide-opacity;
+}
+
+.intro {
+  .hide-opacity;
+  text-align: left;
+  width: 400px;
+
+  position: absolute;
+
+  .transition(opacity, 1s);
+}
+
+#intro1 {
+  top: 100px;
+  left: 50px;
+}
+
+#intro2 {
+  bottom: 0;
+  right: 50px;
+
+  img {
+    float: right;
+    .transform(rotate(-38deg));
+  }
+}
+
+#viewport {
+  clear: both;
+  display: none;
+  margin: @viewportPadding;
+  height: @viewportHeight;
+  position: relative;
+  text-align: center;
+}
+
+#connections {
+  max-height: @viewportHeight - @highlightRadius;
+  position: absolute;
+  left: 0;
+  top: @highlightRadius*2;
+}
+
+#date {
+  color: #ccc;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 156px;
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  z-index: -1000;
+}
+
+#companyTitle {
+  .hide-opacity;
+  margin: 25px 0;
+  position: absolute;
+  top: 0;
+  left: 100px;
+}

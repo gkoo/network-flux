@@ -1,0 +1,30 @@
+#slider {
+  background-color: #000;
+  display: none;
+  height: @barThickness;
+  opacity: 0;
+  overflow: visible;
+  position: relative;
+  .transition(opacity);
+}
+
+#sliderHandle {
+  background-color: #f00;
+  cursor: move;
+  cursor: ew-resize;
+  cursor: -moz-grab;
+  width:  @knobRadius*2;
+  height: @knobRadius*2;
+
+  position: absolute;
+  top: @barThickness/2 - @knobRadius;
+  right: 0;
+
+  .border-radius(@knobRadius);
+
+  &.ui-draggable-dragging {
+    cursor: move;
+    cursor: ew-resize;
+    cursor: -moz-grabbing;
+  }
+}

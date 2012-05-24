@@ -1,7 +1,7 @@
 body{font-family:'Cantata One',Georgia,serif;text-align:center;}
-#title{float:left;margin:0;padding:0;text-align:left;}#title h1{font-size:36px;margin:20px 0;padding:0;}
+#title{display:none;opacity:0;float:left;margin:0;padding:0;text-align:left;-moz-transition:opacity 1s ease-out;-ms-transition:opacity 1s ease-out;-o-transition:opacity 1s ease-out;-webkit-transition:opacity 1s ease-out;transition:opacity 1s ease-out;}#title h1{font-size:36px;margin:20px 0;padding:0;}
 #paper{width:950px;height:750px;margin:0 auto;}
-#signin{display:none;opacity:0;clear:both;padding-top:200px;-moz-transition:all 1s ease-out;-ms-transition:all 1s ease-out;-o-transition:all 1s ease-out;-webkit-transition:all 1s ease-out;transition:all 1s ease-out;}
+#signin{display:none;opacity:0;clear:both;padding-top:200px;-moz-transition:opacity 1s ease-out;-ms-transition:opacity 1s ease-out;-o-transition:opacity 1s ease-out;-webkit-transition:opacity 1s ease-out;transition:opacity 1s ease-out;}
 #share{float:right;margin:25px 0;padding:0;display:none;opacity:0;}
 .intro{display:none;opacity:0;text-align:left;width:400px;position:absolute;-moz-transition:opacity 1s ease-out;-ms-transition:opacity 1s ease-out;-o-transition:opacity 1s ease-out;-webkit-transition:opacity 1s ease-out;transition:opacity 1s ease-out;}
 #intro1{top:100px;left:50px;}
