@@ -58,8 +58,8 @@ addPosition = function(cmpyId, startDate, endDate, profileId) {
 
 createCmpyBuckets = function(profiles, callback) {
   profiles.forEach(function(profile) {
-    var positions = getData(profile.positions),
-        educations = getData(profile.educations),
+    var positions = GordonUtils.getData(profile.positions),
+        educations = GordonUtils.getData(profile.educations),
         companyId, startDate;
 
     if (positions) {

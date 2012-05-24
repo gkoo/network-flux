@@ -1,3 +1,8 @@
+.pointer-cursor() {
+  cursor: pointer;
+  cursor: hand;
+}
+
 .highlighting {
   .cxn-circ-container {
     display: block;
@@ -32,7 +37,7 @@
 }
 
 .cmpy-circ-container {
-  cursor: hand;
+  .pointer-cursor;
   position: absolute;
 }
 
@@ -65,4 +70,10 @@
 
 .cxn-circ-container {
   display: none;
+}
+
+.backBtn {
+  position: absolute;
+  top: @highlightRadius - 10px;
+  left: 21px;
 }

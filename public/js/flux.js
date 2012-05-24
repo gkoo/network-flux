@@ -4,9 +4,7 @@
 //
 // IDEAS
 // =====
-// 1) Click on a circle to show faces of the employees there.
-// 2) Toggle names on and off
-// 3) Add "life" to the circles. Bigger circles move slower, smaller ones move faster.
+// 1) Toggle names on and off
 //
 // http://caniuse.com/webworkers
 var onLinkedInLoad;
@@ -38,25 +36,31 @@ $(function() {
    * Render the network graph at a point in time based on the given percentage.
    */
   getSnapshot = function(evt, percent) {
-    var targetDate,
-        targetDateObj,
-        month,
-        year;
+    var targetDate;
 
     if (!allCmpyEmployees) {
       return;
     }
 
     targetDate = earliestDate + (timespan * percent/100);
-    targetDateObj = new Date(targetDate);
-    month = MONTHS[targetDateObj.getMonth()];
-    year = targetDateObj.getFullYear();
 
-    $dateEl.text(month + ' ' + year);
     snapshotDate = new Date();
     snapshotWorker.postMessage({ allCmpyEmployees: allCmpyEmployees,
                                  targetDate:       targetDate });
-  }
+  },
+
+  updateDate = function(evt, percent) {
+    var targetDate,
+        targetDateObj,
+        month,
+        year;
+
+    targetDate = earliestDate + (timespan * percent/100);
+    targetDateObj = new Date(targetDate);
+    month = MONTHS[targetDateObj.getMonth()];
+    year = targetDateObj.getFullYear();
+    $dateEl.text(month + ' ' + year);
+  },
 
   /**
    * processProfiles
@@ -64,8 +68,8 @@ $(function() {
    * My profile and connection profiles retrieved. Start processing!
    */
   processProfiles = function() {
-    var me = getData(myProfile),
-        cxns = getData(cxnProfiles),
+    var me = GordonUtils.getData(myProfile),
+        cxns = GordonUtils.getData(cxnProfiles),
         allCompanies = {},
         date, cxnWorker;
 
@@ -91,8 +95,7 @@ $(function() {
         // no-op takes around 70-100 ms
         console.log('Processing took ' + ((new Date()).getTime() - date.getTime()) + ' milliseconds');
 
-        fadeIn($('#intro2'));
-        fadeIn($('#slider'));
+        GordonUtils.fadeIn($('#intro2, #slider, #share'));
       }
     }, false);
 
@@ -100,17 +103,15 @@ $(function() {
   },
 
   fillInName = function(profile) {
-    console.log(profile)
     $('#yourname').text(profile.firstName);
     setTimeout(function() {
-      fadeIn($('#intro1'));
+      GordonUtils.fadeIn($('#intro1'));
     }, ANIM_DURATION);
   },
 
   handleOwnProfile = function(data) {
-    var profile = getData(data);
+    var profile = GordonUtils.getData(data);
     if (profile && profile.length) {
-      console.log(profile);
       fillInName(profile[0]);
     }
     else {
@@ -129,27 +130,11 @@ $(function() {
     }
   },
 
-  loadIntro = function() {
-  },
-
-  fadeIn = function($el) {
-    $el.css('display', 'block');
-    setTimeout(function() {
-      $el.css('opacity', '1');
-    }, 50);
-  },
-
-  fadeOut = function($el) {
-    $el.css('opacity', '0');
-    setTimeout(function() {
-      $el.hide();
-    }, ANIM_DURATION);
-  },
-
   init = function() {
-    $(window).bind('slider', getSnapshot);
+    $(window).bind('sliderStop', getSnapshot);
+    $(window).bind('sliderDrag', updateDate);
     $(window).bind('sliderStart', function() {
-      fadeOut($('.intro'));
+      GordonUtils.fadeOut($('.intro'), ANIM_DURATION);
     });
 
     snapshotWorker = new Worker('js/snapshotWorker.js');
@@ -167,7 +152,8 @@ $(function() {
 
   onLinkedInAuth = function() {
     var fields = ["id", "first-name", "last-name","positions:(start-date,end-date,company:(id,name))","picture-url","educations:(school-name,start-date,end-date)","site-standard-profile-request:(url)"];
-    fadeOut($signinEl);
+    GordonUtils.fadeOut($signinEl, ANIM_DURATION);
+    $('#viewport').show();
     if (DO_PROCESSING) {
       // get own profile
       IN.API.Profile('me')
@@ -180,7 +166,7 @@ $(function() {
   };
 
   onLinkedInLoad = function() {
-    fadeIn($signinEl);
+    GordonUtils.fadeIn($signinEl);
     IN.Event.on(IN, "auth", onLinkedInAuth);
   };
 

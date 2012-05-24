@@ -1,34 +1,47 @@
-/**
- * getData
- * =======
- * Takes result from LinkedIn API and returns data values if there are any to
- * return.
- */
-var getData, extend, output;
+var GordonUtils = {
+  /**
+   * getData
+   * =======
+   * Takes result from LinkedIn API and returns data values if there are any to
+   * return.
+   */
+  getData: function(data) {
+    if (data && data.values && data.values.length) {
+      return data.values;
+    }
+    return null;
+  },
 
-getData = function(data) {
-  if (data && data.values && data.values.length) {
-    return data.values;
-  }
-  return null;
-};
-
-// Adds properties of obj2 to obj1 and returns obj1.
-if (typeof extend === 'undefined') {
-  extend = function(obj1, obj2) {
+  /*
+   * extend
+   * ======
+   * Adds properties of obj2 to obj1 and returns obj1.
+   */
+  extend: function(obj1, obj2) {
     for (prop in obj2) {
       if (obj2.hasOwnProperty(prop)) {
         obj1[prop] = obj2[prop];
       }
     }
     return obj1;
-  }
-}
+  },
 
-// debug
-output = function(str) {
-  $('#output').append($('<p>').text(str));
+  fadeIn: function($el) {
+    $el.css('display', 'block');
+    setTimeout(function() {
+      $el.css('opacity', '1');
+    }, 50);
+  },
+
+  fadeOut: function($el, dur) {
+    dur = dur || 500;
+    $el.css('opacity', '0');
+    setTimeout(function() {
+      $el.hide();
+    }, dur);
+  }
 };
+
 
 if (Array && Array.prototype && typeof Array.prototype.forEach === 'undefined') {
   Array.prototype.forEach = function(fn) {

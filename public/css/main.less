@@ -4,26 +4,40 @@ body {
 }
 
 #title {
-  font-size: 36px;
+  float: left;
+  margin: 0;
+  padding: 0;
   text-align: left;
+
+  h1 {
+    font-size: 36px;
+    margin: 20px 0;
+    padding: 0;
+  }
 }
 
-#output {
-  position: absolute;
-  top: 0;
-  right: 0;
+#paper {
+  width: @paperWidth*1px;
+  height: @paperHeight*1px;
+  .center;
 }
 
 #signin {
-  display: none;
-  margin-top: 200px;
-  opacity: 0;
+  .hide-opacity;
+  clear: both;
+  padding-top: 200px;
   .transition-all(1s);
 }
 
+#share {
+  float: right;
+  margin: 25px 0;
+  padding: 0;
+  .hide-opacity;
+}
+
 .intro {
-  display: none;
-  opacity: 0;
+  .hide-opacity;
   text-align: left;
   width: 400px;
 
@@ -43,17 +57,13 @@ body {
 
   img {
     float: right;
-    .transform(rotate(-45deg));
+    .transform(rotate(-38deg));
   }
 }
 
-#paper {
-  width: @paperWidth*1px;
-  height: @paperHeight*1px;
-  .center;
-}
-
 #viewport {
+  clear: both;
+  display: none;
   margin: @viewportPadding;
   height: @viewportHeight;
   position: relative;
@@ -68,15 +78,19 @@ body {
 }
 
 #date {
-  color: #999;
+  color: #ccc;
   font-family: Georgia, "Times New Roman", serif;
   font-size: 156px;
   position: absolute;
-  top: 0;
+  bottom: 0;
   right: 0;
   z-index: -1000;
 }
 
-.cxn-circ-container {
-  display: none;
+#companyTitle {
+  .hide-opacity;
+  margin: 25px 0;
+  position: absolute;
+  top: 0;
+  left: 100px;
 }

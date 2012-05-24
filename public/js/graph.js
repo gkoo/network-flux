@@ -4,6 +4,7 @@ var NetworkGraph;
   var $window          = $(window),
       $viewport        = $('#viewport'),
       $connections     = $('#connections'),
+      $cmpyTitle       = $('#companyTitle'),
       PAPER_WIDTH      = 950,
       PAPER_HEIGHT     = 750,
 
@@ -19,8 +20,8 @@ var NetworkGraph;
 
       // Bounding box for canvas viewport (where the circles are allowed to go)
       VIEWPORT_PADDING = 30,
-      VIEWPORT_WIDTH   = $viewport.width(),
-      VIEWPORT_HEIGHT  = $viewport.height(),
+      VIEWPORT_WIDTH   = PAPER_WIDTH - 2*VIEWPORT_PADDING,
+      VIEWPORT_HEIGHT  = 660,
 
       HIGHLIGHT_RADIUS = 40,
 
@@ -293,7 +294,23 @@ var NetworkGraph;
   };
 
   GraphSliderBar = function() {
-    var $handle,
+    var $handle, timeout, left, timeoutLength = 100,
+
+    update = function() {
+      percent = Math.floor(left/(PAPER_WIDTH - 2*KNOB_RADIUS)*100);
+      $window.trigger('sliderStop', percent);
+      if (timeout) {
+        window.clearTimeout(timeout);
+        timeout = null;
+      }
+    },
+
+    resetTimeout = function() {
+      if (timeout) {
+        window.clearTimeout(timeout);
+      }
+      timeout = setTimeout(update, timeoutLength);
+    },
 
     handleDragStart = function(evt, ui) {
       $window.trigger('sliderStart');
@@ -302,11 +319,24 @@ var NetworkGraph;
         highlightedCirc.unhighlight();
         $window.trigger('circleClick');
       }
+
+      left = ui.position.left;
+      resetTimeout();
+    },
+
+    handleDrag = function(evt, ui) {
+      percent = Math.floor(left/(PAPER_WIDTH - 2*KNOB_RADIUS)*100);
+      $window.trigger('sliderDrag', percent);
+      left = ui.position.left;
+      resetTimeout();
     },
 
     handleDragStop = function(evt, ui) {
-      var percent = Math.floor(ui.position.left/(PAPER_WIDTH - 2*KNOB_RADIUS)*100);
-      $window.trigger('slider', percent);
+      if (timeout) {
+        window.clearTimeout(timeout);
+        timeout = null;
+        update();
+      }
     },
 
     init = function() {
@@ -316,6 +346,7 @@ var NetworkGraph;
         axis:        'x',
         containment: 'parent',
         start:       handleDragStart,
+        drag:        handleDrag,
         stop:        handleDragStop
       });
     };
@@ -329,7 +360,7 @@ var NetworkGraph;
 
   ConnectionCircle.prototype = new NetworkCircle();
 
-  extend(ConnectionCircle.prototype, {
+  GordonUtils.extend(ConnectionCircle.prototype, {
     init: function(profile) {
        var r       = 40, // profile pic is 80x80
           center   = GraphUtils.getRandomCenter(r),
@@ -437,7 +468,7 @@ var NetworkGraph;
 
   CompanyCircle.prototype = new NetworkCircle();
 
-  extend(CompanyCircle.prototype, {
+  GordonUtils.extend(CompanyCircle.prototype, {
     calculateCmpyRadius: function(cmpySize) {
       // Formula: y = -1000/(x+10) + 100
       // http://www.mathsisfun.com/data/function-grapher.php
@@ -477,6 +508,10 @@ var NetworkGraph;
 
       if (this.r !== newRadius) {
         this.setRadius(newRadius);
+        this.$label.css({
+          top: (newRadius-8) + 'px',
+          left: (newRadius-100) + 'px'
+        });
       }
 
       return this;
@@ -505,14 +540,7 @@ var NetworkGraph;
 
     doClick: function(evt) {
       if (!this.wasDragging) {
-        if (isHighlighting && this != highlightedCirc) {
-          // Clicked on a circle, but another was highlighted.
-          // Unhighlight that one, then highlight this one.
-          highlightedCirc.unhighlight();
-        }
-        else {
-          isHighlighting = !isHighlighting;
-        }
+        isHighlighting = !isHighlighting;
         if (isHighlighting) {
           this.highlight();
           highlightedCirc = this;
@@ -585,7 +613,6 @@ var NetworkGraph;
       var numEmployees = this.employees.length,
           i, len, numPerRow, numRows, width, height;
 
-      $viewport.addClass('highlighting');
       if (this.pictures) {
         for (i = 0, len = this.pictures.length; i < len; ++i) {
           this.pictures[i].show();
@@ -600,6 +627,7 @@ var NetworkGraph;
         top: HIGHLIGHT_RADIUS*2 + CXN_WINDOW_HEIGHT/2 - height/2 - this.pictureWidth/2,
         left: VIEWPORT_WIDTH/2 - width/2
       });
+      GordonUtils.fadeIn($cmpyTitle);
     },
 
     addBackButton: function() {
@@ -616,10 +644,14 @@ var NetworkGraph;
     },
 
     highlight: function() {
+      var plural = this.employees.length !== 1;
       this.loadEmployees();
       this.origCx = this.cx;
       this.origCy = this.cy;
+      this.origR = this.r;
       this.setRadius(HIGHLIGHT_RADIUS, false);
+      this.$label.hide();
+      $cmpyTitle.text([this.employees.length, 'connection' + (plural ? 's' : ''), 'at', this.name].join(' '));
       this.move(HIGHLIGHT_RADIUS, HIGHLIGHT_RADIUS, (function() {
         this.$container.addClass('highlighted');
         //this.moveOverlapCircles();
@@ -634,6 +666,7 @@ var NetworkGraph;
       this.setRadius(this.origR);
       this.$container.removeClass('highlighted');
       this.removeBackButton();
+      GordonUtils.fadeOut($cmpyTitle, ANIM_DURATION);
 
       if (this.pictures) {
         this.pictures.forEach(function(cxnCirc) {
@@ -664,6 +697,7 @@ var NetworkGraph;
 
       this.id = id.replace(STRIP_PUNC, '-');
       this.origR = radius;
+      this.name  = cmpyName;
       this.createEl(this.id,
                     radius,
                     cmpyName, // label
@@ -713,9 +747,6 @@ var NetworkGraph;
           cmpyCircle.hide();
         }
       });
-
-      // Debug
-      $('#output').text("Num companies: " + Object.keys(companies).length);
 
       for (cmpyId in companies) {
         var cmpyEmployees = companies[cmpyId];

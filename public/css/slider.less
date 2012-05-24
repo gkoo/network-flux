@@ -10,6 +10,9 @@
 
 #sliderHandle {
   background-color: #f00;
+  cursor: move;
+  cursor: ew-resize;
+  cursor: -moz-grab;
   width:  @knobRadius*2;
   height: @knobRadius*2;
 
@@ -18,4 +21,10 @@
   right: 0;
 
   .border-radius(@knobRadius);
+
+  &.ui-draggable-dragging {
+    cursor: move;
+    cursor: ew-resize;
+    cursor: -moz-grabbing;
+  }
 }
