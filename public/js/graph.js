@@ -124,6 +124,10 @@ var NetworkGraph;
                                });
       this.setBorderRadius(r);
       this.$label = $('<span>').addClass(type + '-label')
+                               .css({
+                                 top: (r-8) + 'px',
+                                 left: (r-100) + 'px'
+                               })
                                .text(name);
       this.$circle.append(this.$label);
       this.$container = $('<div>').addClass('circle-container ' + type + '-circ-container')
@@ -597,6 +601,19 @@ var NetworkGraph;
       });
     },
 
+    addBackButton: function() {
+      this.$circle.append($('<span>').addClass('backBtn')
+                                     .text('Back'));
+                                     //.css({
+                                       //top: HIGHLIGHT_RADIUS-5,
+                                       //position: absolute
+                                     //}));
+    },
+
+    removeBackButton: function() {
+      this.$circle.children('.backBtn').remove();
+    },
+
     highlight: function() {
       this.loadEmployees();
       this.origCx = this.cx;
@@ -606,6 +623,7 @@ var NetworkGraph;
         this.$container.addClass('highlighted');
         //this.moveOverlapCircles();
         this.showEmployees();
+        this.addBackButton();
       }).bind(this));
     },
 
@@ -614,6 +632,7 @@ var NetworkGraph;
       this.move(this.origCx, this.origCy);
       this.setRadius(this.origR);
       this.$container.removeClass('highlighted');
+      this.removeBackButton();
 
       if (this.pictures) {
         this.pictures.forEach(function(cxnCirc) {

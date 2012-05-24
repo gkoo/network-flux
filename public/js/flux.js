@@ -19,12 +19,16 @@ $(function() {
       DO_PROCESSING = 1,
       graph = new NetworkGraph(),
       today = (new Date()).getTime(),
+      $dateEl = $('#date'),
       allCmpyEmployees,
       cmpyNames,
       profileObjs,
       earliestDate,
       timespan,
       snapshotWorker,
+      MONTHS = ['Jan', 'Feb', 'Mar', 'Apr',
+                'May', 'Jun', 'Jul', 'Aug',
+                'Sep', 'Oct', 'Nov', 'Dec'],
 
   /**
    * getSnapshot
@@ -32,8 +36,21 @@ $(function() {
    * Render the network graph at a point in time based on the given percentage.
    */
   getSnapshot = function(evt, percent) {
-    var targetDate = earliestDate + (timespan * percent/100);
-    $('#debug').text(new Date(targetDate));
+    var targetDate,
+        targetDateObj,
+        month,
+        year;
+
+    if (!allCmpyEmployees) {
+      return;
+    }
+
+    targetDate = earliestDate + (timespan * percent/100);
+    targetDateObj = new Date(targetDate);
+    month = MONTHS[targetDateObj.getMonth()];
+    year = targetDateObj.getFullYear();
+
+    $dateEl.text(month + ' ' + year);
     snapshotDate = new Date();
     snapshotWorker.postMessage({ allCmpyEmployees: allCmpyEmployees,
                                  targetDate:       targetDate });
