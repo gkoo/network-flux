@@ -11,7 +11,8 @@ body{font-family:'Cantata One',Georgia,serif;text-align:center;}
 #date{color:#ccc;font-family:Georgia,"Times New Roman",serif;font-size:156px;position:absolute;bottom:0;right:0;z-index:-1000;}
 #companyTitle{display:none;opacity:0;margin:25px 0;position:absolute;top:0;left:100px;}
 #slider{background-color:#000;display:none;height:10px;opacity:0;overflow:visible;position:relative;-moz-transition:opacity 0.5s ease-out;-ms-transition:opacity 0.5s ease-out;-o-transition:opacity 0.5s ease-out;-webkit-transition:opacity 0.5s ease-out;transition:opacity 0.5s ease-out;}
-#sliderHandle{background-color:#f00;cursor:move;cursor:ew-resize;cursor:-moz-grab;width:40px;height:40px;position:absolute;top:-15px;right:0;-moz-border-radius:20px;-ms-border-radius:20px;-o-border-radius:20px;-webkit-border-radius:20px;border-radius:20px;}#sliderHandle.ui-draggable-dragging{cursor:move;cursor:ew-resize;cursor:-moz-grabbing;}
+#sliderHandle{background-color:#069;cursor:move;cursor:ew-resize;cursor:-moz-grab;width:40px;height:40px;position:absolute;top:-15px;right:0;-moz-border-radius:20px;-ms-border-radius:20px;-o-border-radius:20px;-webkit-border-radius:20px;border-radius:20px;}#sliderHandle:hover{background-color:#267696;}
+#sliderHandle.ui-draggable-dragging{cursor:move;cursor:ew-resize;cursor:-moz-grabbing;}
 .highlighting .cxn-circ-container{display:block;}
 .circle-container{-moz-transition:all 0.5s ease-out;-ms-transition:all 0.5s ease-out;-o-transition:all 0.5s ease-out;-webkit-transition:all 0.5s ease-out;transition:all 0.5s ease-out;}.circle-container.hover{z-index:1000;}.circle-container.hover .cmpy-label{display:block;}
 .circle-container.ui-draggable-dragging{z-index:1000;-moz-transition:all 0s;-ms-transition:all 0s;-o-transition:all 0s;-webkit-transition:all 0s;transition:;}.circle-container.ui-draggable-dragging .cmpy-label{display:none;}
