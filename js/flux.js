@@ -4,9 +4,7 @@
 //
 // IDEAS
 // =====
-// 1) Click on a circle to show faces of the employees there.
-// 2) Toggle names on and off
-// 3) Add "life" to the circles. Bigger circles move slower, smaller ones move faster.
+// 1) Toggle names on and off
 //
 // http://caniuse.com/webworkers
 var onLinkedInLoad;
@@ -16,30 +14,53 @@ $(function() {
   var myProfile,
       cxnProfiles,
       allProfiles,
-      DO_PROCESSING = true,
-      currCompanies = {},
-      graph = new NetworkGraph(),
-      today = (new Date()).getTime(),
+      DO_PROCESSING = 1,
+      ANIM_DURATION = 500,
+      graph         = new NetworkGraph(),
+      today         = (new Date()).getTime(),
+      $dateEl       = $('#date'),
+      $signinEl     = $('#signin'),
       allCmpyEmployees,
       cmpyNames,
       profileObjs,
       earliestDate,
       timespan,
       snapshotWorker,
+      MONTHS = ['Jan', 'Feb', 'Mar', 'Apr',
+                'May', 'Jun', 'Jul', 'Aug',
+                'Sep', 'Oct', 'Nov', 'Dec'],
 
   /**
    * getSnapshot
    * ===========
    * Render the network graph at a point in time based on the given percentage.
    */
-  getSnapshot = function(percent) {
-    var targetDate = earliestDate + (timespan * percent/100);
-    currCompanies = {};
-    $('#debug').text(new Date(targetDate));
+  getSnapshot = function(evt, percent) {
+    var targetDate;
+
+    if (!allCmpyEmployees) {
+      return;
+    }
+
+    targetDate = earliestDate + (timespan * percent/100);
+
     snapshotDate = new Date();
     snapshotWorker.postMessage({ allCmpyEmployees: allCmpyEmployees,
                                  targetDate:       targetDate });
-  }
+  },
+
+  updateDate = function(evt, percent) {
+    var targetDate,
+        targetDateObj,
+        month,
+        year;
+
+    targetDate = earliestDate + (timespan * percent/100);
+    targetDateObj = new Date(targetDate);
+    month = MONTHS[targetDateObj.getMonth()];
+    year = targetDateObj.getFullYear();
+    $dateEl.text(month + ' ' + year);
+  },
 
   /**
    * processProfiles
@@ -47,8 +68,8 @@ $(function() {
    * My profile and connection profiles retrieved. Start processing!
    */
   processProfiles = function() {
-    var me = getData(myProfile),
-        cxns = getData(cxnProfiles),
+    var me = GordonUtils.getData(myProfile),
+        cxns = GordonUtils.getData(cxnProfiles),
         allCompanies = {},
         date, cxnWorker;
 
@@ -62,7 +83,6 @@ $(function() {
     date = new Date();
 
     cxnWorker = new Worker('js/cxnWorker.js');
-    cxnWorker.postMessage({ profiles: allProfiles });
     cxnWorker.addEventListener('message', function(evt) {
       if (evt.data) {
         allCmpyEmployees = evt.data.companies;
@@ -74,14 +94,29 @@ $(function() {
         graph.setProfiles(profileObjs);
         // no-op takes around 70-100 ms
         console.log('Processing took ' + ((new Date()).getTime() - date.getTime()) + ' milliseconds');
-        if (output) {
-          output('ready!');
-        }
+
+        GordonUtils.fadeIn($('#intro2, #slider, #share'));
       }
     }, false);
+
+    cxnWorker.postMessage({ profiles: allProfiles });
+  },
+
+  fillInName = function(profile) {
+    $('#yourname').text(profile.firstName);
+    setTimeout(function() {
+      GordonUtils.fadeIn($('#intro1'));
+    }, ANIM_DURATION);
   },
 
   handleOwnProfile = function(data) {
+    var profile = GordonUtils.getData(data);
+    if (profile && profile.length) {
+      fillInName(profile[0]);
+    }
+    else {
+      throw 'Couldn\'t find your profile!';
+    }
     myProfile = data;
     if (cxnProfiles) {
       processProfiles();
@@ -96,16 +131,17 @@ $(function() {
   },
 
   init = function() {
-    if (!Raphael.svg) {
-      // TODO: handle this more elegantly.
-      throw 'SVG not supported.';
-    }
-    eve.on('slide', getSnapshot);
+    $(window).bind('sliderStop', getSnapshot);
+    $(window).bind('sliderDrag', updateDate);
+    $(window).bind('sliderStart', function() {
+      GordonUtils.fadeOut($('.intro'), ANIM_DURATION);
+    });
 
     snapshotWorker = new Worker('js/snapshotWorker.js');
     snapshotWorker.addEventListener('message', function(evt) {
-      var date = new Date();
-      currCompanies = evt.data ? evt.data.currCompanies : null;
+      var date = new Date(),
+          currCompanies = evt.data ? evt.data.currCompanies : null;
+
       if (currCompanies) {
         graph.renderCompanies(currCompanies, cmpyNames);
         // no-op takes around 70-100 ms
@@ -116,7 +152,8 @@ $(function() {
 
   onLinkedInAuth = function() {
     var fields = ["id", "first-name", "last-name","positions:(start-date,end-date,company:(id,name))","picture-url","educations:(school-name,start-date,end-date)","site-standard-profile-request:(url)"];
-    $('#canvas-container').show();
+    GordonUtils.fadeOut($signinEl, ANIM_DURATION);
+    $('#viewport').show();
     if (DO_PROCESSING) {
       // get own profile
       IN.API.Profile('me')
@@ -129,6 +166,7 @@ $(function() {
   };
 
   onLinkedInLoad = function() {
+    GordonUtils.fadeIn($signinEl);
     IN.Event.on(IN, "auth", onLinkedInAuth);
   };
 

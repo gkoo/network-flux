@@ -1,8 +1,12 @@
 var NetworkGraph;
 
 (function() {
-  var PAPER_WIDTH      = 950,
-      PAPER_HEIGHT     = 600,
+  var $window          = $(window),
+      $viewport        = $('#viewport'),
+      $connections     = $('#connections'),
+      $cmpyTitle       = $('#companyTitle'),
+      PAPER_WIDTH      = 950,
+      PAPER_HEIGHT     = 750,
 
       KNOB_RADIUS      = 20,
 
@@ -16,17 +20,19 @@ var NetworkGraph;
 
       // Bounding box for canvas viewport (where the circles are allowed to go)
       VIEWPORT_PADDING = 30,
-      VIEWPORT_TOP     = VIEWPORT_PADDING,
-      VIEWPORT_LEFT    = VIEWPORT_PADDING,
-      VIEWPORT_RIGHT   = PAPER_WIDTH - VIEWPORT_PADDING,
-      VIEWPORT_BOTTOM  = BAR_TOP_Y - VIEWPORT_PADDING,
-      VIEWPORT_MID_X   = VIEWPORT_PADDING + (VIEWPORT_RIGHT - VIEWPORT_LEFT)/2,
-      VIEWPORT_MID_Y   = VIEWPORT_PADDING + (VIEWPORT_BOTTOM - VIEWPORT_TOP)/2,
+      VIEWPORT_WIDTH   = PAPER_WIDTH - 2*VIEWPORT_PADDING,
+      VIEWPORT_HEIGHT  = 660,
+
+      HIGHLIGHT_RADIUS = 40,
+
+      CXN_WINDOW_HEIGHT = VIEWPORT_HEIGHT - 2*HIGHLIGHT_RADIUS,
 
       ANIM_DURATION    = 500,
 
-      cmpyCircles      = {}, // all circles created up to this point
-      currCircles      = [], // the circles currently drawn in the viewport
+      cmpyCircles      = {}, // all company circles created up to this point
+      cxnCircles       = {}, // all connection circles created up to this point
+      currCmpys        = [], // the circles currently drawn in the viewport
+      currCxns         = [], // the circles currently drawn in the viewport
       isDragging       = false,
       isHighlighting   = false, // are we highlighting a circle?
       highlightedCirc,
@@ -34,124 +40,165 @@ var NetworkGraph;
       paper,
 
       GraphSliderBar,
+      NetworkCircle,
       ConnectionCircle,
       CompanyCircle,
       GraphUtils;
 
-  GraphSliderBar = function() {
-    var mouseDownX, newMouseX, bar, knob,
+  GraphUtils = {
+    // isInBounds
+    // ==========
+    // Returns if the circle is in bounds.
+    isInBounds: function(x, y, r) {
+      return this.xInBounds(x, r) && this.yInBounds(y, r);
+    },
 
-    handleKnobDrag = function(dx) {
-      newX = mouseDownX + dx;
-      if (newX >= BAR_LEFT_BOUND && newX <= BAR_RIGHT_BOUND) {
-        newMouseX = newX;
-        knob.attr({ 'cx': newX });
+    xInBounds: function(x, r) {
+      return (x - r) > 0 &&
+             (x + r) < VIEWPORT_WIDTH;
+    },
+
+    yInBounds: function(y, r) {
+      return (y - r) > 0 &&
+             (y + r) < VIEWPORT_HEIGHT;
+    },
+
+    // getRandomCenter
+    // ===============
+    // Returns random center coordinates that ensure the circle will be drawn
+    // completely within the boundaries of the canvas.
+    getRandomCenter: function(radius) {
+      var cx = Math.floor(Math.random()*(VIEWPORT_WIDTH)),
+          cy = Math.floor(Math.random()*(VIEWPORT_HEIGHT));
+
+      return GraphUtils.moveAwayFromEdge(cx, cy, radius);
+    },
+
+    isIntersecting: function(circ1, circ2) {
+      var r1 = circ1.r,
+          r2 = circ2.r,
+          d1 = r1 * 2,
+          d2 = r2 * 2,
+          x1 = circ1.cx - r1,
+          x2 = circ2.cx - r2,
+          y1 = circ1.cy - r1,
+          y2 = circ2.cy - r2,
+          intersect = false;
+
+      return ((x1 + d1 >= x2 && x1 <= x2 + d2) && // x-axis intersects.
+              (y1 + d1 >= y2 && y1 <= y2 + d2)); // y-axis intersects.
+    },
+
+    moveAwayFromEdge: function(cx, cy, r) {
+      var left   = cx - r,
+          right  = cx + r,
+          top    = cy - r,
+          bottom = cy + r;
+
+      if (left <= 0) {
+        cx = r;
       }
-    },
-
-    handleKnobDragStart = function(x, y, evt) {
-      mouseDownX = knob.attr('cx');
-      if (isHighlighting && highlightedCirc) {
-        highlightedCirc.unhighlight();
-        isHighlighting = false;
+      else if (right > VIEWPORT_WIDTH) {
+        cx = VIEWPORT_WIDTH - r;
       }
-    },
+      if (top <= 0) {
+        cy = r;
+      }
+      else if (bottom > VIEWPORT_HEIGHT) {
+        cy = VIEWPORT_HEIGHT - r;
+      }
 
-    handleKnobDragStop = function(x, y, evt) {
-      eve('slide', this, Math.floor((newMouseX-BAR_LEFT_BOUND)/BAR_WIDTH * 100));
-    },
-
-    init = function() {
-      bar = paper.rect(BAR_LEFT_BOUND, // top left x
-                       BAR_TOP_Y,      // top left y
-                       BAR_WIDTH,      // width
-                       BAR_THICKNESS); // height
-      bar.fill('#000');
-
-      knob = paper.circle(KNOB_RADIUS*3/2 + BAR_WIDTH,  // center x
-                          BAR_CENTER_Y,  // center y
-                          KNOB_RADIUS); // radius
-
-      knob.fill('#f00');
-
-      knob.drag(handleKnobDrag,
-                handleKnobDragStart,
-                handleKnobDragStop);
-    };
-
-    init();
-  };
-
-  ConnectionCircle = function(profile, cx, cy) {
-    this.init(profile, cx, cy);
-  };
-
-  ConnectionCircle.prototype = {
-    IMG_DIM: 80,
-
-    init: function(profile, cx, cy) {
-      var imgDim = this.IMG_DIM,
-          x = cx - imgDim/2,
-          y = cy - imgDim/2;
-
-      this.el = paper.rect(x, y, imgDim, imgDim, imgDim/2)
-                     .attr({ 'fill': 'url(' + profile.pictureUrl + ')' })
-                     .hide();
-    },
-
-    hide: function() {
-      this.el.hide();
-    },
-
-    show: function() {
-      this.el.show();
+      return { x: cx,
+               y: cy };
     }
   };
 
-  CompanyCircle = function(cmpyEmployees, cmpyName) {
-    this.init(cmpyEmployees, cmpyName);
-  };
+  NetworkCircle = function() {};
 
-  CompanyCircle.prototype = {
-    calculateCmpyRadius: function(cmpySize) {
-      // Formula: y = -1000/(x+10) + 100
-      // http://www.mathsisfun.com/data/function-grapher.php
-      var radius = 100 - (1000/(cmpySize+10))
+  NetworkCircle.prototype = {
+    createEl: function(id, r, name, type) {
+      this.r  = r;
+      this.$circle = $('<div>').addClass('circle ' + type + '-circ')
+                               .css({
+                                 width: r*2,
+                                 height: r*2
+                               });
+      this.setBorderRadius(r);
+      this.$label = $('<span>').addClass(type + '-label')
+                               .css({
+                                 top: (r-8) + 'px',
+                                 left: (r-100) + 'px'
+                               })
+                               .text(name);
+      this.$circle.append(this.$label);
+      this.$container = $('<div>').addClass('circle-container ' + type + '-circ-container')
+                                  .attr('id', 'circle-'+id)
+                                  .append(this.$circle);
+      return this;
+    },
 
-      // Want radius to be minimum of 10
-      return Math.max(radius, 10);
+    setBorderRadius: function(r) {
+      var r2 = r*2;
+      this.$circle.css({
+        '-moz-border-radius':    r2 + 'px',
+        '-ms-border-radius':     r2 + 'px',
+        '-o-border-radius':      r2 + 'px',
+        '-webkit-border-radius': r2 + 'px',
+        'border-radius':         r2 + 'px'
+      });
     },
 
     show: function() {
-      this.el.show();
+      this.$container.show();
       return this;
     },
 
     hide: function() {
-      this.el.hide();
-      this.label.hide();
+      this.$container.hide();
       return this;
     },
 
     // move
     // ====
     // Convenience method to move both the circle and the label
-    //
-    // @onComplete: callback to be invoked when animation is complete.
-    move: function(x, y, animate, onComplete) {
-      var coords = { 'cx': x, 'cy': y },
-          el     = this.el;
-      this.label.hide();
-      if (animate) {
-        el.animate(coords, ANIM_DURATION, 'ease-out', onComplete);
+    move: function(cx, cy, onComplete) {
+      var $circle = this.$circle,
+          coords  = { left: cx - this.r, top: cy - this.r };
+
+      this.cx = cx;
+      this.cy = cy;
+
+      this.$container.css(coords);
+      if (onComplete) {
+        setTimeout(onComplete, ANIM_DURATION);
       }
-      else {
-        el.attr(coords);
+      return this;
+    },
+
+    setRadius: function(r, recenter) {
+      var diam = 2*r,
+          newX,
+          newY;
+
+      if (typeof recenter === 'undefined') {
+        recenter = true;
       }
-      this.label.attr({
-                        'x': x,
-                        'y': y - el.attr('r') - 5
-                      });
+
+      if (recenter) {
+        this.$container.css({
+          left: this.cx - r,
+          top:  this.cy - r
+        });
+      }
+      this.$circle.css({
+        width: diam + 'px',
+        height: diam + 'px'
+      });
+
+      this.r = r;
+      this.setBorderRadius(r);
+
+      return this;
     },
 
     // findOpenSpace
@@ -166,21 +213,16 @@ var NetworkGraph;
     // @cy: center y of highlighted circle
     // @radius: radius of highlighted circle
     findOpenSpace: function(cx, cy, rad) {
-      var el       = this.el,
-          pi       = Math.PI,
-          myX      = el.attr('cx'),
-          myY      = el.attr('cy'),
-          myR      = el.attr('r'), // my radius
-          diffX    = myX - cx,     // adjacent
-          diffY    = cy - myY,     // opposite
+      var pi         = Math.PI,
+          imgRad     = this.IMG_DIM ? this.IMG_DIM/2 : null,
+          diffX      = this.cx - cx,     // adjacent
+          diffY      = cy - this.cy,     // opposite
                                    // browser coord system is upside down.
-          hypot    = Math.sqrt(diffX*diffX + diffY*diffY),
-          angle    = Math.asin(diffY/hypot),
-          newHypot = Math.max(rad*3/2, 30) + myR,
+          hypot      = Math.sqrt(diffX*diffX + diffY*diffY),
+          angle      = Math.asin(diffY/hypot),
+          newHypot   = Math.max(rad*3/2, 30) + this.r,
           angleIncrements = [Math.PI/2, (-1)*Math.PI/2, Math.PI],
-          i, len, newX, newY, tmpAngle;
-
-      this.el.stop(); // stop any existing animation
+          newCenter, i, len, newX, newY, tmpAngle;
 
       // Handle some ambiguous cases.
       if (diffX < 0 && diffY > 0) {
@@ -189,19 +231,17 @@ var NetworkGraph;
       else if (angle < 0 && diffX < 0 && diffY < 0) {
         angle = pi - angle;
       }
-      else if (myY === cy && diffX < 0) {
+      else if (this.cy === cy && diffX < 0) {
         angle = pi;
       }
 
-      newX     = cx + Math.cos(angle)*newHypot,
-      newY     = cy + Math.sin(angle)*newHypot * (-1); // flip to right side up
+      newX = cx + Math.cos(angle)*newHypot;
+      newY = cy + Math.sin(angle)*newHypot * (-1); // flip to right side up
 
       // Handle circle flying out of bounds.
       // Try going right 90 degrees, then left 90 degrees, then 180.
-      i = 0;
-      len = angleIncrements.length;
-      while (!GraphUtils.isInBounds(newX, newY, myR)) {
-        if (i >= len) {
+      for (i = 0, len = angleIncrements.length; i < len; ++i) {
+        if (GraphUtils.isInBounds(newX, newY, this.r)) {
           break;
         }
         tmpAngle = angle + angleIncrements[i++];
@@ -209,65 +249,271 @@ var NetworkGraph;
         newY     = cy + Math.sin(tmpAngle)*newHypot * (-1); // flip to right side up
       }
 
-      if (!GraphUtils.isInBounds(newX, newY, myR)) {
+      if (!GraphUtils.isInBounds(newX, newY, this.r)) {
         // Didn't find a new in-bounds position. This shouldn't happen.
         console.log('Couldn\'t find a in-bounds position to jump to!');
+        // Last resort ... just find a random x,y to jump to
+        newCenter = GraphUtils.getRandomCenter(this.r);
+        newX = newCenter.x;
+        newY = newCenter.y;
       }
       else {
         angle = tmpAngle;
       }
 
-      this.move(newX, newY, true);
+      this.move(newX, newY);
     },
 
-    // moveOverlapCircles
-    // ==================
+    // moveOverlapCirclesProto
+    // =======================
     // Detect other circles that overlap with this one, and move them!
-    moveOverlapCircles: function() {
+    // Intended to be curried by implementing classes.
+    //
+    //
+    // @circleList: list of elements against which to check for collisions
+    moveOverlapCirclesProto: function(circleList) {
       // Check if any other circles have intersecting BBoxes.
-      var overlapCircles = [],
-          el             = this.el,
-          myId           = el.id,
-          myBBox         = el.getBBox();
+      var self           = this,
+          overlapCircles = [];
 
-      currCircles.forEach(function(circ) {
-        var bbox;
-
+      circleList.forEach(function(circ) {
         // Don't compare the same circle to itself
-        if (circ.el.id !== myId) {
-          bbox = circ.el.getBBox();
-          if (Raphael.isBBoxIntersect(myBBox, bbox)) {
-            overlapCircles.push(circ);
-          }
+        if (circ !== self && GraphUtils.isIntersecting(self, circ)) {
+          overlapCircles.push(circ);
         }
       });
 
       overlapCircles.forEach(function(circ) {
-        circ.findOpenSpace(el.attr('cx'), el.attr('cy'), el.attr('r'));
+        circ.findOpenSpace(self.cx, self.cy, self.r);
       });
+    },
+
+    getContainer: function() {
+      return this.$container;
+    }
+  };
+
+  GraphSliderBar = function() {
+    var $handle, timeout, left, timeoutLength = 100,
+
+    update = function() {
+      percent = Math.floor(left/(PAPER_WIDTH - 2*KNOB_RADIUS)*100);
+      $window.trigger('sliderStop', percent);
+      if (timeout) {
+        window.clearTimeout(timeout);
+        timeout = null;
+      }
+    },
+
+    resetTimeout = function() {
+      if (timeout) {
+        window.clearTimeout(timeout);
+      }
+      timeout = setTimeout(update, timeoutLength);
+    },
+
+    handleDragStart = function(evt, ui) {
+      $window.trigger('sliderStart');
+      if (isHighlighting && highlightedCirc) {
+        isHighlighting = false;
+        highlightedCirc.unhighlight();
+        $window.trigger('circleClick');
+      }
+
+      left = ui.position.left;
+      resetTimeout();
+    },
+
+    handleDrag = function(evt, ui) {
+      percent = Math.floor(left/(PAPER_WIDTH - 2*KNOB_RADIUS)*100);
+      $window.trigger('sliderDrag', percent);
+      left = ui.position.left;
+      resetTimeout();
+    },
+
+    handleDragStop = function(evt, ui) {
+      if (timeout) {
+        window.clearTimeout(timeout);
+        timeout = null;
+        update();
+      }
+    },
+
+    init = function() {
+      this.$el = $('#slider');
+      $handle = this.$el.find('#sliderHandle');
+      $handle.draggable({
+        axis:        'x',
+        containment: 'parent',
+        start:       handleDragStart,
+        drag:        handleDrag,
+        stop:        handleDragStop
+      });
+    };
+
+    init();
+  };
+
+  ConnectionCircle = function(profile) {
+    this.init(profile);
+  };
+
+  ConnectionCircle.prototype = new NetworkCircle();
+
+  GordonUtils.extend(ConnectionCircle.prototype, {
+    init: function(profile) {
+       var r       = 40, // profile pic is 80x80
+          center   = GraphUtils.getRandomCenter(r),
+          x        = center.x - r,
+          y        = center.y - r,
+          linkEl   = $('<a>'),
+          photoUrl = profile.pictureUrl || 'img/icon_no_photo_80x80.png',
+          url      = profile.siteStandardProfileRequest ? profile.siteStandardProfileRequest.url : '#';
+
+      this.id = profile.id;
+      this.profile = profile;
+      this.createEl(profile.id,
+                    r,
+                    profile.firstName + ' ' + profile.lastName,
+                    'cxn');
+      linkEl.attr({
+        href: url || '#',
+        title: profile.firstName + ' ' + profile.lastName,
+        target: '_new'
+      });
+      linkEl.append($('<img>').addClass('cxn-picture')
+                              .attr('src', photoUrl));
+      this.$circle.append(linkEl);
+    },
+
+    show: function() {
+      this.$container.css('display', 'inline-block');
+    },
+
+    doDrag: function(dx, dy) {
+      var newX, newY, el;
+      if (isDragging) {
+        el = this.el;
+        newX = this.mouseDownX + dx;
+        newY = this.mouseDownY + dy;
+        if (this.xInBounds(newX)) {
+          el.attr({ 'x': newX });
+        }
+        if (this.yInBounds(newY)) {
+          el.attr({ 'y': newY });
+        }
+      }
+    },
+
+    doDragStart: function() {
+      var el = this.el;
+
+      this.mouseDownX = el.attr('x');
+      this.mouseDownY = el.attr('y');
+
+      isDragging = true;
+      el.stop();
+    },
+
+    doDragStop: function() {
+      if (isDragging) {
+        this.moveOverlapCircles();
+        isDragging = false;
+      }
+    },
+
+    setCenter: function(cx, cy) {
+      var imgDim = this.IMG_DIM,
+          x = cx - imgDim/2,
+          y = cy - imgDim/2;
+
+      this.el.attr({ 'x': x, 'y': y });
+    },
+
+    setImageWidth: function(width) {
+      this.$container.find('img').css({
+        width: width,
+        height: width
+      });
+      return this;
+    },
+
+    xInBounds: function(x) {
+      var midCircR = highlightedCirc.el.attr('r'),
+          inBounds = (x >= 0 && x + this.IMG_DIM <= VIEWPORT_WIDTH);
+
+      return inBounds && (x + this.IMG_DIM <= VIEWPORT_WIDTH/2 - midCircR &&
+                          x <= VIEWPORT_WIDTH/2 + midCircR);
+    },
+
+    yInBounds: function(y) {
+      var midCircR = highlightedCirc.el.attr('r'),
+          inBounds = (y >= 0 &&
+                      y + this.IMG_DIM <= VIEWPORT_HEIGHT);
+
+      return inBounds && (y + this.IMG_DIM <= VIEWPORT_HEIGHT/2 - midCircR ||
+                          y <= VIEWPORT_HEIGHT/2 + midCircR);
+    },
+
+    // Curries the NetworkCircle.moveOverlapCircles function with currCxns
+    // (specifies that we want to compare this circle against other cxn circles)
+    moveOverlapCircles: function() {
+      return this.moveOverlapCirclesProto.call(this, currCxns);
+    }
+  });
+
+  CompanyCircle = function(id, cmpyEmployees, cmpyName) {
+    this.init(id, cmpyEmployees, cmpyName);
+  };
+
+  CompanyCircle.prototype = new NetworkCircle();
+
+  GordonUtils.extend(CompanyCircle.prototype, {
+    calculateCmpyRadius: function(cmpySize) {
+      // Formula: y = -1000/(x+10) + 100
+      // http://www.mathsisfun.com/data/function-grapher.php
+      var radius = 100 - (1000/(cmpySize+10))
+
+      // Want radius to be minimum of 10
+      return Math.max(radius, 10);
+    },
+
+    // Curries the NetworkCircle.moveOverlapCircles function with currCmpys
+    // (specifies that we want to compare this circle against other cmpy circles)
+    moveOverlapCircles: function() {
+      return this.moveOverlapCirclesProto.call(this, currCmpys);
     },
 
     // setEmployees
     // ============
     // Resizes the circle based on the number of employees.
     setEmployees: function(employees) {
-      var el = this.el,
-          oldRadius = el.attr('r'),
+      var oldRadius = this.r,
           newRadius = this.calculateCmpyRadius(employees.length),
-          oldLabelY = this.label.attr('y'),
-          x = el.attr('cx'),
-          y = el.attr('cy'),
+          cx = this.cx,
+          cy = this.cy,
           point;
 
       this.employees = employees;
+      this.pictures = [];
 
       // recheck bounds when resizing circle
-      if (!GraphUtils.isInBounds(x, y, newRadius)) {
-        point = this.moveAwayFromEdge(x, y, newRadius);
-        x = point.x;
-        y = point.y;
+      if (!GraphUtils.isInBounds(cx, cy, newRadius)) {
+        point = GraphUtils.moveAwayFromEdge(cx, cy, newRadius);
+        cx = point.x;
+        cy = point.y;
       }
-      el.animate({ 'cx': x, 'cy': y, 'r': newRadius }, ANIM_DURATION, 'ease-out', this.resetLabelPosition.bind(this));
+
+      this.move(cx, cy);
+
+      if (this.r !== newRadius) {
+        this.setRadius(newRadius);
+        this.$label.css({
+          top: (newRadius-8) + 'px',
+          left: (newRadius-100) + 'px'
+        });
+      }
+
       return this;
     },
 
@@ -277,137 +523,41 @@ var NetworkGraph;
     },
 
     doHoverIn: function () {
-      var el     = this.el;
-
-      if (isDragging) {
-        return;
-      }
-
-      this.label.show();
-
+      //if (isDragging) {
+        //return;
+      //}
       if (!isHighlighting) {
-        this.label.toFront();
-        this.el.toFront();
+        this.$container.addClass('hover');
+        this.$label.show();
         this.moveOverlapCircles();
       }
     },
 
     doHoverOut: function() {
-      this.label.hide();
-      collidingCircles = [];
+      this.$container.removeClass('hover');
+      this.$label.hide();
     },
 
-    doClick: function() {
-      if (this.clicked) {
-        if (isHighlighting && this != highlightedCirc) {
-          // Clicked on a circle, but another was highlighted.
-          // Unhighlight that one, then highlight this one.
-          highlightedCirc.unhighlight();
+    doClick: function(evt) {
+      if (!this.wasDragging) {
+        isHighlighting = !isHighlighting;
+        if (isHighlighting) {
+          this.highlight();
+          highlightedCirc = this;
         }
         else {
-          isHighlighting = !isHighlighting;
+          this.unhighlight();
         }
-        highlightedCirc = this;
-        eve('circleClick', this);
+        $window.trigger('circleClick', this);
       }
+      this.wasDragging = false;
     },
 
-    doDrag: function(dx, dy) {
-      var newX, newY, el;
-      if (isDragging) {
-        el = this.el;
-        newX = this.mouseDownX + dx;
-        newY = this.mouseDownY + dy;
-        if (GraphUtils.xInBounds(newX, el.attr('r'))) {
-          el.attr({ 'cx': newX });
-        }
-        if (GraphUtils.yInBounds(newY, el.attr('r'))) {
-          el.attr({ 'cy': newY });
-        }
-      }
-    },
-
-    doDragStart: function() {
-      var el = this.el;
-
-      this.mouseDownX = el.attr('cx');
-      this.mouseDownY = el.attr('cy');
-
-      if (isHighlighting) {
-        if (this === highlightedCirc) {
-          return;
-        }
-        else {
-          highlightedCirc.unhighlight();
-          isHighlighting = false;
-        }
-      }
-
-      isDragging = true;
-      el.stop();
-      this.label.hide();
-    },
-
-    doDragStop: function() {
-      var el = this.el;
-      if (isDragging) {
-        this.resetLabelPosition();
-        this.label.show();
-        this.moveOverlapCircles();
-
-        if (!isHighlighting) {
-          el.data('cx', el.attr('cx'));
-          el.data('cy', el.attr('cy'));
-        }
-        isDragging = false;
-      }
-
-      // Have to do this stupid check because every drag event also produces a
-      // click event.
-      this.clicked = (this.mouseDownX === el.attr('cx') &&
-                      this.mouseDownY === el.attr('cy'));
-    },
-
-    moveAwayFromEdge: function(x, y, r) {
-      var left   = x - r,
-          top    = y - r,
-          right  = left + 2*r,
-          bottom = top + 2*r;
-
-      if (typeof x === 'undefined') {
-        x = this.el.attr('x');
-        y = this.el.attr('y');
-        r = this.el.attr('r');
-      }
-
-      if (left < VIEWPORT_PADDING) {
-        x = VIEWPORT_PADDING + r;
-      }
-      else if (right > VIEWPORT_RIGHT) {
-        x = PAPER_WIDTH - VIEWPORT_PADDING - r;
-      }
-      if (top < VIEWPORT_PADDING) {
-        y = VIEWPORT_PADDING + r;
-      }
-      else if (bottom > BAR_TOP_Y - VIEWPORT_PADDING) {
-        y = BAR_TOP_Y - VIEWPORT_PADDING - r;
-      }
-
-      return { x: x,
-               y: y };
-    },
-
-    // getCenter
-    // =========
-    // Returns random center coordinates that ensure the circle will be drawn
-    // completely within the boundaries of the canvas.
-    getCenter: function(radius) {
-      var x      = Math.floor(Math.random()*PAPER_WIDTH),
-          y      = Math.floor(Math.random()*BAR_TOP_Y),
-          point  = this.moveAwayFromEdge(x, y, radius);
-
-      return { x: point.x,
-               y: point.y };
+    doDragStop: function(evt, ui) {
+      this.wasDragging = true;
+      this.cx = ui.position.left + this.r;
+      this.cy = ui.position.top + this.r;
+      this.moveOverlapCircles();
     },
 
     // loadEmployees
@@ -415,136 +565,159 @@ var NetworkGraph;
     // Creates the ConnectionCircles, so that we can start loading images, but
     // keeps the RaphaelJS elements hidden for now.
     loadEmployees: function() {
-      var self         = this,
-          idx          = 0,
-          ringNum      = 0, // concentric circles around which to position pictures
-          pi           = Math.PI,
-          cmpyR        = this.el.attr('r'),
-          anglesNarrow = [pi/2, 3*pi/2, 0, pi, pi/4, 5*pi/4, 3*pi/4, 7*pi/4],
-          anglesMed    = [pi/2, pi/3, pi/6, 0, 11*pi/6, 5*pi/3, 3*pi/2, 4*pi/3,
-                          7*pi/6, pi, 5*pi/6, 2*pi/3], // start from top and work clockwise around
-          anglesWide   = [pi/2, pi/3, pi/4, pi/6, 0, 11*pi/6, 7*pi/4, 5*pi/3,
-                          3*pi/2, 4*pi/3, 5*pi/4, 7*pi/6, pi, 5*pi/6, 3*pi/4,
-                          2*pi/3],
-          i, len;
+      var self              = this,
+          noPictureProfiles = [],
+          numEmployees      = this.employees.length,
+          cxnWindowArea     = VIEWPORT_WIDTH*CXN_WINDOW_HEIGHT;
 
-      this.pictures = [];
-      for (i = 0, len = this.employees.length; i < len; ++i) {
-        var empId       = this.employees[i],
-            profile     = profileData[empId],
-            IMG_DIM     = 80,
-            ringRadius  = cmpyR + 10 + ringNum*IMG_DIM + IMG_DIM/2,
-            anglesToUse, cx, cy;
+      if (cxnWindowArea/(80*80) < numEmployees) {
+        // fit pictures to connections box.
+        this.pictureWidth = Math.floor(Math.sqrt(VIEWPORT_WIDTH*CXN_WINDOW_HEIGHT/numEmployees)*9/10);
+        // set minimum image width to 20
+        this.pictureWidth = Math.max(20, this.pictureWidth);
+      }
+      else {
+        this.pictureWidth = 80;
+      }
 
-        // Choose how far apart to space circles based on ring number.
-        switch (ringNum) {
-          case 0:
-            anglesToUse = anglesNarrow;
-            break;
-          case 1:
-            anglesToUse = anglesMed;
-            break;
-          default:
-            anglesToUse = anglesWide;
-        }
+      this.employees.forEach(function(empId) {
+        var profile = profileData[empId],
+            cxnCircle;
 
-        cx = VIEWPORT_MID_X + Math.cos(anglesToUse[idx])*ringRadius,
-        cy = VIEWPORT_MID_Y + Math.sin(anglesToUse[idx])*ringRadius*(-1); // -1 for upside down browser coords
-
-        if (profile.pictureUrl) {
-          self.pictures.push(new ConnectionCircle(profile, cx, cy));
-          //output(profile.firstName + ' ' + profile.lastName);
-
-          if (idx >= anglesToUse.length -1) {
-            ++ringNum;
+        cxnCircle = cxnCircles[profile.id];
+        if (!cxnCircle) {
+          cxnCircle = new ConnectionCircle(profile);
+          cxnCircles[profile.id] = cxnCircle;
+          if (profile.pictureUrl) {
+            $connections.append(cxnCircle.getContainer());
           }
-
-          idx = (idx + 1) % anglesToUse.length;
+          else {
+            noPictureProfiles.push(cxnCircle);
+          }
         }
-      };
+        cxnCircle.setRadius(self.pictureWidth/2, false)
+                 .setImageWidth(self.pictureWidth);
+        self.pictures.push(cxnCircle);
+      });
+
+      // Add pictures with no profiles to DOM last.
+      noPictureProfiles.forEach(function(circ) {
+        $connections.append(circ.getContainer());
+      });
     },
 
     // showEmployees
     // =============
     // Reveals the ConnectionCircles
     showEmployees: function() {
-      this.pictures.forEach(function(picCircle) {
-        picCircle.show();
+      var numEmployees = this.employees.length,
+          i, len, numPerRow, numRows, width, height;
+
+      if (this.pictures) {
+        for (i = 0, len = this.pictures.length; i < len; ++i) {
+          this.pictures[i].show();
+        }
+      }
+
+      numPerRow = Math.floor(VIEWPORT_WIDTH/this.pictureWidth);
+      numRows = Math.ceil(this.employees.length/numPerRow);
+      width = (this.pictureWidth + 2) * (numPerRow > numEmployees ? numEmployees : numPerRow);
+      height = numRows * (this.pictureWidth + 2); // + 2 for border
+      $connections.css({
+        top: HIGHLIGHT_RADIUS*2 + CXN_WINDOW_HEIGHT/2 - height/2 - this.pictureWidth/2,
+        left: VIEWPORT_WIDTH/2 - width/2
       });
+      GordonUtils.fadeIn($cmpyTitle);
+    },
+
+    addBackButton: function() {
+      this.$circle.append($('<span>').addClass('backBtn')
+                                     .text('Back'));
+                                     //.css({
+                                       //top: HIGHLIGHT_RADIUS-5,
+                                       //position: absolute
+                                     //}));
+    },
+
+    removeBackButton: function() {
+      this.$circle.children('.backBtn').remove();
     },
 
     highlight: function() {
+      var plural = this.employees.length !== 1;
       this.loadEmployees();
-      this.move(VIEWPORT_MID_X, VIEWPORT_MID_Y, true, (function() {
-        this.moveOverlapCircles();
-        this.el.fill('#00f'); // TODO: make it glow!
+      this.origCx = this.cx;
+      this.origCy = this.cy;
+      this.origR = this.r;
+      this.setRadius(HIGHLIGHT_RADIUS, false);
+      this.$label.hide();
+      $cmpyTitle.text([this.employees.length, 'connection' + (plural ? 's' : ''), 'at', this.name].join(' '));
+      this.move(HIGHLIGHT_RADIUS, HIGHLIGHT_RADIUS, (function() {
+        this.$container.addClass('highlighted');
+        //this.moveOverlapCircles();
         this.showEmployees();
+        this.addBackButton();
       }).bind(this));
     },
 
     unhighlight: function() {
       // move back to original position
-      var el = this.el,
-          cx = el.data('cx');
-          cy = el.data('cy');
-
-      el.toFront();
-      this.move(cx, cy, true);
-      this.el.fill('#fff');
-      $('#output').empty(); // TODO: remove this line
+      this.move(this.origCx, this.origCy);
+      this.setRadius(this.origR);
+      this.$container.removeClass('highlighted');
+      this.removeBackButton();
+      GordonUtils.fadeOut($cmpyTitle, ANIM_DURATION);
 
       if (this.pictures) {
-        this.pictures.forEach(function(cxnCircle) {
-          cxnCircle.hide();
+        this.pictures.forEach(function(cxnCirc) {
+          cxnCirc.hide();
         });
+        currCxns = [];
       }
+      $viewport.removeClass('highlighting');
     },
 
-    handleClick: function() {
-      if (isHighlighting) {
-        this.highlight();
-      }
-      else {
-        this.unhighlight();
-      }
+    positionEl: function(x, y, r) {
+      this.cx = x;
+      this.cy = y;
+      this.$container.css({
+        left: this.cx-r,
+        top:  this.cy-r
+      });
+      return this;
     },
 
-    init: function(cmpyEmployees, cmpyName) {
+    init: function(id, cmpyEmployees, cmpyName) {
       var radius = this.calculateCmpyRadius(cmpyEmployees.length),
-          coords = this.getCenter(radius),
+          coords = GraphUtils.getRandomCenter(radius),
           x      = coords.x,
           y      = coords.y,
-          self   = this;
+          self   = this,
+          STRIP_PUNC = /[^\w\d-_]/gi;
 
-      this.el  = paper.circle(x, // center x
-                              y, // center y
-                              radius)
-                      .fill('#fff')
-                      .data('size', cmpyEmployees.length)
-                      .data('cx', x)
-                      .data('cy', y);
+      this.id = id.replace(STRIP_PUNC, '-');
+      this.origR = radius;
+      this.name  = cmpyName;
+      this.createEl(this.id,
+                    radius,
+                    cmpyName, // label
+                    'cmpy')  // circle type
+          .positionEl(x, y, radius);
 
-      this.label = paper.text(x, y-radius-5, cmpyName)
-                        .fill('#000')
-                        .hide();
+      this.$circle.click(this.doClick.bind(this))
+                  .hover(this.doHoverIn.bind(this),
+                         this.doHoverOut.bind(this));
 
-      this.el.hover(this.doHoverIn,
-                    this.doHoverOut,
-                    this,
-                    this)
-             .click(this.doClick, this)
-             .drag(this.doDrag,
-                   this.doDragStart,
-                   this.doDragStop,
-                   this,
-                   this,
-                   this);
+      this.$container.css('position', 'absolute').draggable({
+        containment: 'parent',
+        stop: this.doDragStop.bind(this)
+      })
 
       this.employees = cmpyEmployees;
 
-      eve.on('circleClick', this.handleClick);
+      this.pictures = [];
     }
-  };
+  });
 
   NetworkGraph = function() {
     this.init();
@@ -552,74 +725,57 @@ var NetworkGraph;
 
   NetworkGraph.prototype = {
     init: function() {
-      paper = new Raphael(document.getElementById('canvas-container'), PAPER_WIDTH, PAPER_HEIGHT);
       this.sliderBar = new GraphSliderBar();
 
-      //eve.on('circleClick', this.fadeOtherCircles);
+      $window.on('circleClick', this.fadeOtherCircles.bind(this));
     },
 
     renderCompanies: function(companies, cmpyNames) {
-      var cmpyCircle, x, y, radius;
+      var cmpyCircle, x, y, radius, tmpCmpys = [];
 
       // Hide current company circles
-      for (cmpyId in cmpyCircles) {
-        cmpyCircles[cmpyId].hide();
-      }
-
-      currCircles = [];
-
-      // Debug
-      $('#output').text("Num companies: " + Object.keys(companies).length);
+      currCmpys.forEach(function(cmpyCircle) {
+        var employees = companies[cmpyCircle.id];
+        if (employees) {
+          // This circle is part of the next view. Don't hide, just resize.
+          cmpyCircle.setEmployees(employees);
+          tmpCmpys.push(cmpyCircle);
+          companies[cmpyCircle.id] = 0; // we don't need to render this company
+        }
+        else {
+          // This circle is not part of the next view. Hide.
+          cmpyCircle.hide();
+        }
+      });
 
       for (cmpyId in companies) {
-        cmpyCircle = cmpyCircles[cmpyId];
+        var cmpyEmployees = companies[cmpyId];
 
-        // If the company circle already exists, just show it.
-        if (cmpyCircle) {
-          cmpyCircle.show()
-                    .setEmployees(companies[cmpyId]);
-        }
-        // It didn't exist. Create it.
-        else {
-          cmpyCircle = new CompanyCircle(companies[cmpyId], cmpyNames[cmpyId]);
+        if (cmpyEmployees) {
+          cmpyCircle = new CompanyCircle(cmpyId, companies[cmpyId], cmpyNames[cmpyId]);
           cmpyCircles[cmpyId] = cmpyCircle;
+          $viewport.append(cmpyCircle.getContainer());
+          tmpCmpys.push(cmpyCircle);
         }
-
-        currCircles.push(cmpyCircle);
       }
+      currCmpys = tmpCmpys;
     },
 
     fadeOtherCircles: function() {
-      var self = this,
-          fill = isHighlighting ? '#004' : '#fff';
-      currCircles.forEach(function(circ) {
-        if (circ.el.id !== self.el.id) {
-          circ.el.animate({ 'fill': fill }, 2000, 'linear');
+      currCmpys.forEach(function(circ) {
+        if (circ.id !== highlightedCirc.id) {
+          if (isHighlighting) {
+            circ.hide();
+          }
+          else {
+            circ.show();
+          }
         }
       });
     },
 
     setProfiles: function(profiles) {
       profileData = profiles;
-    }
-  };
-
-  GraphUtils = {
-    // isInBounds
-    // ==========
-    // Returns if the circle is in bounds.
-    isInBounds: function(x, y, r) {
-      return this.xInBounds(x, r) && this.yInBounds(y, r);
-    },
-
-    xInBounds: function(x, r) {
-      return (x - r) > VIEWPORT_LEFT &&
-             (x + r) < VIEWPORT_RIGHT;
-    },
-
-    yInBounds: function(y, r) {
-      return (y - r) > VIEWPORT_TOP &&
-             (y + r) < VIEWPORT_BOTTOM;
     }
   };
 })();
