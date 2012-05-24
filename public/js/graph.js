@@ -296,6 +296,7 @@ var NetworkGraph;
     var $handle,
 
     handleDragStart = function(evt, ui) {
+      $window.trigger('sliderStart');
       if (isHighlighting && highlightedCirc) {
         isHighlighting = false;
         highlightedCirc.unhighlight();
@@ -312,10 +313,10 @@ var NetworkGraph;
       this.$el = $('#slider');
       $handle = this.$el.find('#sliderHandle');
       $handle.draggable({
-        axis: 'x',
+        axis:        'x',
         containment: 'parent',
-        start: handleDragStart,
-        stop: handleDragStop
+        start:       handleDragStart,
+        stop:        handleDragStop
       });
     };
 

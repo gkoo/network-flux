@@ -1,8 +1,11 @@
 #slider {
   background-color: #000;
+  display: none;
   height: @barThickness;
+  opacity: 0;
   overflow: visible;
   position: relative;
+  .transition(opacity);
 }
 
 #sliderHandle {

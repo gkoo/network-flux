@@ -17,9 +17,11 @@ $(function() {
       cxnProfiles,
       allProfiles,
       DO_PROCESSING = 1,
-      graph = new NetworkGraph(),
-      today = (new Date()).getTime(),
-      $dateEl = $('#date'),
+      ANIM_DURATION = 500,
+      graph         = new NetworkGraph(),
+      today         = (new Date()).getTime(),
+      $dateEl       = $('#date'),
+      $signinEl     = $('#signin'),
       allCmpyEmployees,
       cmpyNames,
       profileObjs,
@@ -88,16 +90,32 @@ $(function() {
         graph.setProfiles(profileObjs);
         // no-op takes around 70-100 ms
         console.log('Processing took ' + ((new Date()).getTime() - date.getTime()) + ' milliseconds');
-        if (output) {
-          output('ready!');
-        }
+
+        fadeIn($('#intro2'));
+        fadeIn($('#slider'));
       }
     }, false);
 
     cxnWorker.postMessage({ profiles: allProfiles });
   },
 
+  fillInName = function(profile) {
+    console.log(profile)
+    $('#yourname').text(profile.firstName);
+    setTimeout(function() {
+      fadeIn($('#intro1'));
+    }, ANIM_DURATION);
+  },
+
   handleOwnProfile = function(data) {
+    var profile = getData(data);
+    if (profile && profile.length) {
+      console.log(profile);
+      fillInName(profile[0]);
+    }
+    else {
+      throw 'Couldn\'t find your profile!';
+    }
     myProfile = data;
     if (cxnProfiles) {
       processProfiles();
@@ -111,16 +129,28 @@ $(function() {
     }
   },
 
-  debug = function() {
-    $('#circle-Stanford-University').find('.cmpy-circ').css({
-      width: '30px',
-      height: '30px',
-      'background-color': '#f00'
-    });
+  loadIntro = function() {
+  },
+
+  fadeIn = function($el) {
+    $el.css('display', 'block');
+    setTimeout(function() {
+      $el.css('opacity', '1');
+    }, 50);
+  },
+
+  fadeOut = function($el) {
+    $el.css('opacity', '0');
+    setTimeout(function() {
+      $el.hide();
+    }, ANIM_DURATION);
   },
 
   init = function() {
     $(window).bind('slider', getSnapshot);
+    $(window).bind('sliderStart', function() {
+      fadeOut($('.intro'));
+    });
 
     snapshotWorker = new Worker('js/snapshotWorker.js');
     snapshotWorker.addEventListener('message', function(evt) {
@@ -133,13 +163,11 @@ $(function() {
         console.log('Processing took ' + (date.getTime() - snapshotDate.getTime()) + ' milliseconds');
       }
     }, false);
-
-    $('#debugBtn').click(debug);
   },
 
   onLinkedInAuth = function() {
     var fields = ["id", "first-name", "last-name","positions:(start-date,end-date,company:(id,name))","picture-url","educations:(school-name,start-date,end-date)","site-standard-profile-request:(url)"];
-    $('#canvas-container').show();
+    fadeOut($signinEl);
     if (DO_PROCESSING) {
       // get own profile
       IN.API.Profile('me')
@@ -152,6 +180,7 @@ $(function() {
   };
 
   onLinkedInLoad = function() {
+    fadeIn($signinEl);
     IN.Event.on(IN, "auth", onLinkedInAuth);
   };
 

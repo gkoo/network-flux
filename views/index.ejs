@@ -1,17 +1,27 @@
 <html>
   <head>
     <title>Network Flux</title>
+    <link href='http://fonts.googleapis.com/css?family=Cantata+One' rel='stylesheet' type='text/css'>
     <link rel="stylesheet/less" href="css/style.less"></link>
     <script src="js/less-1.3.0.min.js"></script>
   </head>
   <body>
-    <script type="in/Login">
-    Hello, <?js= firstName ?> <?js= lastName ?>.
-    </script>
-
-    <div id="output"></div>
     <div id="paper">
+      <h1 id="title">Network Flux</h1>
+      <div id="signin">
+        <p>See how your network evolves over time.</p>
+        <script type="in/Login" data-size="large">
+        </script>
+      </div>
       <div id="viewport">
+        <div id="intro1" class="intro">
+          <h2>Hello, <span id="yourname"></span></h2>
+          <p>Your LinkedIn network isn't static. It moves, grows, and evolves, just as you do throughout your career. What shape does your network take?</p>
+        </div>
+        <div id="intro2" class="intro">
+          <p>Discover the reach of your network. To get started, try dragging the slider to a point in your timeline.</p>
+          <img src="img/arrow-drawn.gif">
+        </div>
         <div id="connections"></div>
         <div id="date"></div>
       </div>
