@@ -16,7 +16,7 @@ body{font-family:'Cantata One',Georgia,serif;text-align:center;}
 .circle-container{-moz-transition:all 0.5s ease-out;-ms-transition:all 0.5s ease-out;-o-transition:all 0.5s ease-out;-webkit-transition:all 0.5s ease-out;transition:all 0.5s ease-out;}.circle-container.hover{z-index:1000;}.circle-container.hover .cmpy-label{display:block;}
 .circle-container.ui-draggable-dragging{z-index:1000;-moz-transition:all 0s;-ms-transition:all 0s;-o-transition:all 0s;-webkit-transition:all 0s;transition:;}.circle-container.ui-draggable-dragging .cmpy-label{display:none;}
 .circle-container.highlighted .cmpy-circ{background-color:#fff;}
-.cmpy-circ-container{cursor:pointer;cursor:hand;position:absolute;}
+.cmpy-circ-container{cursor:pointer;cursor:hand;position:absolute;}.cmpy-circ-container.hover .cmpy-circ{background-color:#fff;}
 .circle{border:1px solid #000;-moz-transition:all 0.5s ease-out;-ms-transition:all 0.5s ease-out;-o-transition:all 0.5s ease-out;-webkit-transition:all 0.5s ease-out;transition:all 0.5s ease-out;}
 .cmpy-circ{background-color:#eee;position:relative;}
 .cxn-circ{overflow:hidden;}
