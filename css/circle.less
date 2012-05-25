@@ -9,6 +9,7 @@
   }
 }
 
+// GENERIC CIRCLE
 .circle-container {
   .transition-all;
 
@@ -36,6 +37,12 @@
   }
 }
 
+.circle {
+  border: 1px solid #000;
+  .transition-all;
+}
+
+// COMPANY CIRCLE
 .cmpy-circ-container {
   .pointer-cursor;
   position: absolute;
@@ -45,18 +52,9 @@
   }
 }
 
-.circle {
-  border: 1px solid #000;
-  .transition-all;
-}
-
 .cmpy-circ {
   background-color: #eee;
   position: relative;
-}
-
-.cxn-circ {
-  overflow: hidden;
 }
 
 .cmpy-label {
@@ -68,11 +66,16 @@
   left: 0;
 }
 
-.cxn-label {
+// CONNECTION CIRCLE
+.cxn-circ-container {
   display: none;
 }
 
-.cxn-circ-container {
+.cxn-circ {
+  overflow: hidden;
+}
+
+.cxn-label {
   display: none;
 }
 

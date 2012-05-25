@@ -60,7 +60,8 @@ createCmpyBuckets = function(profiles, callback) {
   profiles.forEach(function(profile) {
     var positions = GordonUtils.getData(profile.positions),
         educations = GordonUtils.getData(profile.educations),
-        companyId, startDate;
+        STRIP_PUNC = /[^\w\d-_]/gi,
+        companyId, schoolNameStripped, startDate;
 
     if (positions) {
       positions.forEach(function(position) {
@@ -75,14 +76,19 @@ createCmpyBuckets = function(profiles, callback) {
     }
     if (educations) {
       educations.forEach(function(edu) {
-        if (edu.schoolName && edu.startDate) {
-          // School and start date exist. Store in allCompanies.
-          addPosition(edu.schoolName, edu.startDate, edu.endDate, profile.id);
-        }
         if (edu.schoolName) {
+          schoolNameStripped = edu.schoolName.replace(STRIP_PUNC, '-');
+          if (edu.startDate) {
+            // School and start date exist. Store in allCompanies.
+            addPosition(schoolNameStripped,
+                        edu.startDate,
+                        edu.endDate,
+                        profile.id);
+          }
+
           // Yeah I know this is stupid. But it's also stupid that there are no school IDs.
           // Don't judge me!
-          cmpyNames[edu.schoolName] = edu.schoolName;
+          cmpyNames[schoolNameStripped] = edu.schoolName;
         }
       });
     }

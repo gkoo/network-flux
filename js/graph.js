@@ -28,6 +28,7 @@ var NetworkGraph;
       CXN_WINDOW_HEIGHT = VIEWPORT_HEIGHT - 2*HIGHLIGHT_RADIUS,
 
       ANIM_DURATION    = 500,
+      BIG_RADIUS       = 40, // radius threshold for always showing labels
 
       cmpyCircles      = {}, // all company circles created up to this point
       cxnCircles       = {}, // all connection circles created up to this point
@@ -37,7 +38,6 @@ var NetworkGraph;
       isHighlighting   = false, // are we highlighting a circle?
       highlightedCirc,
       profileData,
-      paper,
 
       GraphSliderBar,
       NetworkCircle,
@@ -82,8 +82,7 @@ var NetworkGraph;
           x1 = circ1.cx - r1,
           x2 = circ2.cx - r2,
           y1 = circ1.cy - r1,
-          y2 = circ2.cy - r2,
-          intersect = false;
+          y2 = circ2.cy - r2;
 
       return ((x1 + d1 >= x2 && x1 <= x2 + d2) && // x-axis intersects.
               (y1 + d1 >= y2 && y1 <= y2 + d2)); // y-axis intersects.
@@ -130,6 +129,9 @@ var NetworkGraph;
                                  left: (r-100) + 'px'
                                })
                                .text(name);
+      if (r >= BIG_RADIUS) {
+        this.$label.show();
+      }
       this.$circle.append(this.$label);
       this.$container = $('<div>').addClass('circle-container ' + type + '-circ-container')
                                   .attr('id', 'circle-'+id)
@@ -194,6 +196,13 @@ var NetworkGraph;
         width: diam + 'px',
         height: diam + 'px'
       });
+
+      if (r >= BIG_RADIUS) {
+        this.$label.show();
+      }
+      else {
+        this.$label.hide();
+      }
 
       this.r = r;
       this.setBorderRadius(r);
@@ -297,7 +306,7 @@ var NetworkGraph;
     var $handle, timeout, left, timeoutLength = 100,
 
     update = function() {
-      percent = Math.floor(left/(PAPER_WIDTH - 2*KNOB_RADIUS)*100);
+      percent = left/(PAPER_WIDTH - 2*KNOB_RADIUS);
       $window.trigger('sliderStop', percent);
       if (timeout) {
         window.clearTimeout(timeout);
@@ -314,6 +323,7 @@ var NetworkGraph;
 
     handleDragStart = function(evt, ui) {
       $window.trigger('sliderStart');
+      // If a circle is currently highlighted, reset the state.
       if (isHighlighting && highlightedCirc) {
         isHighlighting = false;
         highlightedCirc.unhighlight();
@@ -325,7 +335,7 @@ var NetworkGraph;
     },
 
     handleDrag = function(evt, ui) {
-      percent = Math.floor(left/(PAPER_WIDTH - 2*KNOB_RADIUS)*100);
+      percent = left/(PAPER_WIDTH - 2*KNOB_RADIUS);
       $window.trigger('sliderDrag', percent);
       left = ui.position.left;
       resetTimeout();
@@ -535,7 +545,9 @@ var NetworkGraph;
 
     doHoverOut: function() {
       this.$container.removeClass('hover');
-      this.$label.hide();
+      if (this.r < BIG_RADIUS) {
+        this.$label.hide();
+      }
     },
 
     doClick: function(evt) {
@@ -692,10 +704,9 @@ var NetworkGraph;
           coords = GraphUtils.getRandomCenter(radius),
           x      = coords.x,
           y      = coords.y,
-          self   = this,
-          STRIP_PUNC = /[^\w\d-_]/gi;
+          self   = this;
 
-      this.id = id.replace(STRIP_PUNC, '-');
+      this.id = id;
       this.origR = radius;
       this.name  = cmpyName;
       this.createEl(this.id,

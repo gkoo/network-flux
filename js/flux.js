@@ -42,7 +42,7 @@ $(function() {
       return;
     }
 
-    targetDate = earliestDate + (timespan * percent/100);
+    targetDate = earliestDate + (timespan * percent);
 
     snapshotDate = new Date();
     snapshotWorker.postMessage({ allCmpyEmployees: allCmpyEmployees,
@@ -55,7 +55,7 @@ $(function() {
         month,
         year;
 
-    targetDate = earliestDate + (timespan * percent/100);
+    targetDate = earliestDate + (timespan * percent);
     targetDateObj = new Date(targetDate);
     month = MONTHS[targetDateObj.getMonth()];
     year = targetDateObj.getFullYear();
