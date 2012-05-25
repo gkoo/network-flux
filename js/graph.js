@@ -129,9 +129,6 @@ var NetworkGraph;
                                  left: (r-100) + 'px'
                                })
                                .text(name);
-      if (r >= BIG_RADIUS) {
-        this.$label.show();
-      }
       this.$circle.append(this.$label);
       this.$container = $('<div>').addClass('circle-container ' + type + '-circ-container')
                                   .attr('id', 'circle-'+id)
@@ -177,13 +174,16 @@ var NetworkGraph;
       return this;
     },
 
-    setRadius: function(r, recenter) {
+    setRadius: function(r, recenter, isCompany) {
       var diam = 2*r,
           newX,
           newY;
 
       if (typeof recenter === 'undefined') {
         recenter = true;
+      }
+      if (typeof isCompany === 'undefined') {
+        isCompany = true;
       }
 
       if (recenter) {
@@ -197,7 +197,7 @@ var NetworkGraph;
         height: diam + 'px'
       });
 
-      if (r >= BIG_RADIUS) {
+      if (isCompany && r >= BIG_RADIUS) {
         this.$label.show();
       }
       else {
@@ -607,7 +607,7 @@ var NetworkGraph;
             noPictureProfiles.push(cxnCircle);
           }
         }
-        cxnCircle.setRadius(self.pictureWidth/2, false)
+        cxnCircle.setRadius(self.pictureWidth/2, false, false)
                  .setImageWidth(self.pictureWidth);
         self.pictures.push(cxnCircle);
       });
@@ -670,13 +670,15 @@ var NetworkGraph;
         this.showEmployees();
         this.addBackButton();
       }).bind(this));
+      this.$container.draggable('option', 'disabled', true);
     },
 
     unhighlight: function() {
       // move back to original position
       this.move(this.origCx, this.origCy);
       this.setRadius(this.origR);
-      this.$container.removeClass('highlighted');
+      this.$container.removeClass('highlighted')
+                     .draggable('option', 'disabled', false);
       this.removeBackButton();
       GordonUtils.fadeOut($cmpyTitle, ANIM_DURATION);
 
@@ -722,7 +724,11 @@ var NetworkGraph;
       this.$container.css('position', 'absolute').draggable({
         containment: 'parent',
         stop: this.doDragStop.bind(this)
-      })
+      });
+
+      if (radius >= BIG_RADIUS) {
+        this.$label.show();
+      }
 
       this.employees = cmpyEmployees;
 
