@@ -2,13 +2,8 @@
 // TODO: handle no-connections case
 // TODO: check for web worker support
 //
-// IDEAS
-// =====
-// 1) Toggle names on and off
-//
 // http://caniuse.com/webworkers
 var onLinkedInLoad;
-var snapshotDate;
 
 $(function() {
   var myProfile,
@@ -20,15 +15,28 @@ $(function() {
       today         = (new Date()).getTime(),
       $dateEl       = $('#date'),
       $signinEl     = $('#signin'),
+      hasWorkers    = typeof window.Worker !== 'undefined',
       allCmpyEmployees,
+      allSchoolmates,
       cmpyNames,
       profileObjs,
       earliestDate,
+      snapshotDate,
       timespan,
       snapshotWorker,
       MONTHS = ['Jan', 'Feb', 'Mar', 'Apr',
                 'May', 'Jun', 'Jul', 'Aug',
                 'Sep', 'Oct', 'Nov', 'Dec'],
+
+  getTargetDate = function(targetDate) {
+    var target = new Date(targetDate);
+    target.setDate(15);
+    target.setHours(0);
+    target.setMinutes(0);
+    target.setSeconds(0);
+    target.setMilliseconds(0);
+    return target;
+  },
 
   /**
    * getSnapshot
@@ -36,29 +44,28 @@ $(function() {
    * Render the network graph at a point in time based on the given percentage.
    */
   getSnapshot = function(evt, percent) {
-    var targetDate;
+    var targetDate, target;
 
-    if (!allCmpyEmployees) {
+    if (!allCmpyEmployees || !allSchoolmates) {
       return;
     }
 
-    targetDate = earliestDate + (timespan * percent);
+    target = earliestDate + (timespan * percent);
+    targetDate = getTargetDate(target);
 
     snapshotDate = new Date();
     snapshotWorker.postMessage({ allCmpyEmployees: allCmpyEmployees,
-                                 targetDate:       targetDate });
+                                 allSchoolmates:   allSchoolmates,
+                                 targetDate:       targetDate.getTime() });
   },
 
   updateDate = function(evt, percent) {
-    var targetDate,
-        targetDateObj,
-        month,
-        year;
+    var target, targetDate, month, year;
 
-    targetDate = earliestDate + (timespan * percent);
-    targetDateObj = new Date(targetDate);
-    month = MONTHS[targetDateObj.getMonth()];
-    year = targetDateObj.getFullYear();
+    target     = earliestDate + (timespan * percent);
+    targetDate = getTargetDate(target);
+    month      = MONTHS[targetDate.getMonth()];
+    year       = targetDate.getFullYear();
     $dateEl.text(month + ' ' + year);
   },
 
@@ -86,12 +93,16 @@ $(function() {
     cxnWorker.addEventListener('message', function(evt) {
       if (evt.data) {
         allCmpyEmployees = evt.data.companies;
+        allSchoolmates   = evt.data.schools;
         cmpyNames        = evt.data.cmpyNames;
         profileObjs      = evt.data.profileObjs;
         earliestDate     = evt.data.earliestDate;
         timespan         = today - earliestDate;
 
-        graph.setProfiles(profileObjs);
+        graph.setData({
+          profiles: profileObjs,
+          cmpyNames: cmpyNames
+        });
         // no-op takes around 70-100 ms
         console.log('Processing took ' + ((new Date()).getTime() - date.getTime()) + ' milliseconds');
 
@@ -130,6 +141,22 @@ $(function() {
     }
   },
 
+  handleSnapshot = function(evt) {
+    var date = new Date(),
+        currCompanies, targetDate, dateKey;
+
+    if (evt.data) {
+      currCompanies = evt.data.currCompanies || null;
+      currSchools   = evt.data.currSchools || null;
+      targetDate    = evt.data.date ? new Date(evt.data.date) : null;
+    }
+
+    if (currCompanies) {
+      graph.setCompanies(currCompanies, currSchools, cmpyNames);
+      console.log('Processing took ' + (date.getTime() - snapshotDate.getTime()) + ' milliseconds');
+    }
+  },
+
   init = function() {
     $(window).bind('sliderStop', getSnapshot);
     $(window).bind('sliderDrag', updateDate);
@@ -138,16 +165,7 @@ $(function() {
     });
 
     snapshotWorker = new Worker('js/snapshotWorker.js');
-    snapshotWorker.addEventListener('message', function(evt) {
-      var date = new Date(),
-          currCompanies = evt.data ? evt.data.currCompanies : null;
-
-      if (currCompanies) {
-        graph.renderCompanies(currCompanies, cmpyNames);
-        // no-op takes around 70-100 ms
-        console.log('Processing took ' + (date.getTime() - snapshotDate.getTime()) + ' milliseconds');
-      }
-    }, false);
+    snapshotWorker.addEventListener('message', handleSnapshot, false);
   },
 
   onLinkedInAuth = function() {

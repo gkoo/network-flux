@@ -27,10 +27,14 @@ var getSnapshot = function(allCmpyEmployees, targetDate) {
 
 self.addEventListener('message', function(evt) {
   var allCmpyEmployees = evt.data.allCmpyEmployees,
-      targetDate = evt.data.targetDate,
-      currCompanies = getSnapshot(allCmpyEmployees, targetDate);
+      allSchoolmates   = evt.data.allSchoolmates,
+      targetDate       = evt.data.targetDate,
+      currCompanies    = getSnapshot(allCmpyEmployees, targetDate),
+      currSchools      = getSnapshot(allSchoolmates, targetDate);
 
   self.postMessage({
-    currCompanies: currCompanies
+    date:          targetDate,
+    currCompanies: currCompanies,
+    currSchools:   currSchools
   });
 }, false);

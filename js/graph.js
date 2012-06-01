@@ -33,17 +33,21 @@ var NetworkGraph;
       cmpyCircles      = {}, // all company circles created up to this point
       cxnCircles       = {}, // all connection circles created up to this point
       currCmpys        = [], // the circles currently drawn in the viewport
+      currSchools      = [], // the circles currently drawn in the viewport
       currCxns         = [], // the circles currently drawn in the viewport
       isDragging       = false,
       isHighlighting   = false, // are we highlighting a circle?
       highlightedCirc,
       profileData,
+      cmpyNames,
 
       GraphSliderBar,
       NetworkCircle,
       ConnectionCircle,
       CompanyCircle,
-      GraphUtils;
+      GraphUtils,
+      ConnectionCollection,
+      CompanyCollection;
 
   GraphUtils = {
     // isInBounds
@@ -372,7 +376,7 @@ var NetworkGraph;
 
   GordonUtils.extend(ConnectionCircle.prototype, {
     init: function(profile) {
-       var r       = 40, // profile pic is 80x80
+      var r       = 40, // profile pic is 80x80
           center   = GraphUtils.getRandomCenter(r),
           x        = center.x - r,
           y        = center.y - r,
@@ -472,8 +476,8 @@ var NetworkGraph;
     }
   });
 
-  CompanyCircle = function(id, cmpyEmployees, cmpyName) {
-    this.init(id, cmpyEmployees, cmpyName);
+  CompanyCircle = function(id, cmpyEmployees, cmpyName, isSchool) {
+    this.init(id, cmpyEmployees, cmpyName, isSchool);
   };
 
   CompanyCircle.prototype = new NetworkCircle();
@@ -701,7 +705,7 @@ var NetworkGraph;
       return this;
     },
 
-    init: function(id, cmpyEmployees, cmpyName) {
+    init: function(id, cmpyEmployees, cmpyName, isSchool) {
       var radius = this.calculateCmpyRadius(cmpyEmployees.length),
           coords = GraphUtils.getRandomCenter(radius),
           x      = coords.x,
@@ -721,10 +725,11 @@ var NetworkGraph;
                   .hover(this.doHoverIn.bind(this),
                          this.doHoverOut.bind(this));
 
-      this.$container.css('position', 'absolute').draggable({
-        containment: 'parent',
-        stop: this.doDragStop.bind(this)
-      });
+      this.$container.addClass(isSchool ? 'school' : '')
+                     .css('position', 'absolute').draggable({
+                       containment: 'parent',
+                       stop: this.doDragStop.bind(this)
+                     });
 
       if (radius >= BIG_RADIUS) {
         this.$label.show();
@@ -736,26 +741,68 @@ var NetworkGraph;
     }
   });
 
-  NetworkGraph = function() {
+  CompanyCollection = function() {
     this.init();
   };
 
-  NetworkGraph.prototype = {
-    init: function() {
-      this.sliderBar = new GraphSliderBar();
+  CompanyCollection.prototype = {
+    $viewport: $('#companies'),
 
-      $window.on('circleClick', this.fadeOtherCircles.bind(this));
+    /**
+     * add
+     * ===
+     * Creates a company circle object and adds it to the collection.
+     */
+    add: function(id, employees, cmpyName, isSchool) {
+      // TODO: FINISH THIS
+      var cmpyCircle = new CompanyCircle(id, employees, cmpyName, isSchool);
+      this.renderCompany(cmpyCircle);
+      return cmpyCircle;
     },
 
-    renderCompanies: function(companies, cmpyNames) {
-      var cmpyCircle, x, y, radius, tmpCmpys = [];
+    renderCompany: function(cmpyCircle) {
+      this.$viewport.append(cmpyCircle.getContainer());
+    },
 
-      // Hide current company circles
+    showRemainingCompanies: function(cmpysToShow, isSchool, tmpCmpys) {
+      var employees;
+      for (id in cmpysToShow) {
+        employees = cmpysToShow[id];
+
+        if (employees) {
+          cmpyCircle = cmpyCircles[id];
+          if (cmpyCircle) {
+            cmpyCircle.setEmployees(employees)
+                      .show();
+          }
+          else {
+            cmpyCircle = this.add(id, cmpysToShow[id], cmpyNames[id], isSchool);
+            cmpyCircles[id] = cmpyCircle;
+          }
+          tmpCmpys.push(cmpyCircle);
+        }
+      }
+    },
+
+    renderCompanies: function(companies, schools) {
+      var cmpyCircle, x, y, radius, cmpyEmployees,
+          tmpCmpys = []; // placeholder for currCmpys
+
+      // Loop through the currently displayed companies and hide them unless
+      // they are part of the next view.
       currCmpys.forEach(function(cmpyCircle) {
-        var employees = companies[cmpyCircle.id];
+        var employees = companies[cmpyCircle.id],
+            schoolmates = schools[cmpyCircle.id];
+
         if (employees) {
           // This circle is part of the next view. Don't hide, just resize.
           cmpyCircle.setEmployees(employees);
+          tmpCmpys.push(cmpyCircle);
+          companies[cmpyCircle.id] = 0; // we don't need to render this company
+        }
+        else if (schoolmates) {
+          // This circle is part of the next view. Don't hide, just resize.
+          cmpyCircle.setEmployees(schoolmates);
           tmpCmpys.push(cmpyCircle);
           companies[cmpyCircle.id] = 0; // we don't need to render this company
         }
@@ -765,17 +812,43 @@ var NetworkGraph;
         }
       });
 
-      for (cmpyId in companies) {
-        var cmpyEmployees = companies[cmpyId];
+      // Render or unhide the companies that weren't part of the previous view.
+      this.showRemainingCompanies(companies, false, tmpCmpys);
+      this.showRemainingCompanies(schools, true, tmpCmpys);
 
-        if (cmpyEmployees) {
-          cmpyCircle = new CompanyCircle(cmpyId, companies[cmpyId], cmpyNames[cmpyId]);
-          cmpyCircles[cmpyId] = cmpyCircle;
-          $viewport.append(cmpyCircle.getContainer());
-          tmpCmpys.push(cmpyCircle);
-        }
-      }
       currCmpys = tmpCmpys;
+    },
+
+    init: function() {
+      this.$el = $('#companies');
+    }
+  };
+
+  ConnectionViewport = function() {
+    this.init();
+  };
+
+  ConnectionViewport.prototype = {
+    init: function() {
+      this.$el = $('#connections');
+    }
+  };
+
+  NetworkGraph = function() {
+    this.init();
+  };
+
+  NetworkGraph.prototype = {
+    init: function() {
+      this.sliderBar      = new GraphSliderBar();
+      this.cmpyCollection = new CompanyCollection();
+      //this.cxnCollection  = new ConnectionCollection();
+
+      $window.on('circleClick', this.fadeOtherCircles.bind(this));
+    },
+
+    setCompanies: function(companies, schools) {
+      this.cmpyCollection.renderCompanies(companies, schools);
     },
 
     fadeOtherCircles: function() {
@@ -791,8 +864,9 @@ var NetworkGraph;
       });
     },
 
-    setProfiles: function(profiles) {
-      profileData = profiles;
+    setData: function(o) {
+      profileData = o.profiles || null;
+      cmpyNames = o.cmpyNames || null;
     }
   };
 })();

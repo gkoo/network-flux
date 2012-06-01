@@ -6,20 +6,14 @@
 // Oh god. do I want to factor in when the connection first shared a company/education? To show how your network grows over time? v2.
 
 
+var earliestDate = 0,
+
 // normalizeDate
 // =============
 // Takes date from LinkedIn response and normalizes
 // to epochTime.
 //
 // @liDate: date in the form of '6-2011'
-var allCompanies = {},
-
-cmpyNames = {},
-
-profileObjs = {},
-
-earliestDate = 0,
-
 normalizeDate = function(liDate) {
   var date;
   if (!liDate) {
@@ -41,7 +35,7 @@ normalizeDate = function(liDate) {
  * ===========
  * Helper function for adding a position/education to allCompanies.
  */
-addPosition = function(cmpyId, startDate, endDate, profileId) {
+addPosition = function(cmpyId, collection, startDate, endDate, profileId) {
   var startDateNorm = normalizeDate(startDate);
       endDateNorm   = normalizeDate(endDate);
 
@@ -49,14 +43,19 @@ addPosition = function(cmpyId, startDate, endDate, profileId) {
     earliestDate = startDateNorm;
   }
 
-  if (!allCompanies[cmpyId]) {
-    allCompanies[cmpyId] = {};
+  if (!collection[cmpyId]) {
+    collection[cmpyId] = {};
   }
 
-  allCompanies[cmpyId][profileId] = [startDateNorm, endDateNorm].join(':');
+  collection[cmpyId][profileId] = [startDateNorm, endDateNorm].join(':');
 },
 
 createCmpyBuckets = function(profiles, callback) {
+  var allCompanies = {},
+      allSchools = {};
+      cmpyNames = {},
+      profileObjs = {},
+
   profiles.forEach(function(profile) {
     var positions = GordonUtils.getData(profile.positions),
         educations = GordonUtils.getData(profile.educations),
@@ -67,7 +66,7 @@ createCmpyBuckets = function(profiles, callback) {
       positions.forEach(function(position) {
         if (position.company && position.company.id && position.startDate) {
           // Company and start date exist. Store in allCompanies.
-          addPosition(position.company.id, position.startDate, position.endDate, profile.id);
+          addPosition(position.company.id, allCompanies, position.startDate, position.endDate, profile.id);
         }
         if (position.company.id && position.company.name) {
           cmpyNames[position.company.id] = position.company.name;
@@ -81,6 +80,7 @@ createCmpyBuckets = function(profiles, callback) {
           if (edu.startDate) {
             // School and start date exist. Store in allCompanies.
             addPosition(schoolNameStripped,
+                        allSchools,
                         edu.startDate,
                         edu.endDate,
                         profile.id);
@@ -98,6 +98,7 @@ createCmpyBuckets = function(profiles, callback) {
 
   callback(null, {
     companies:    allCompanies,
+    schools:      allSchools,
     profileObjs:  profileObjs,
     cmpyNames:    cmpyNames,
     earliestDate: earliestDate
