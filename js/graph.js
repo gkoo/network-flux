@@ -23,17 +23,18 @@ var NetworkGraph;
       VIEWPORT_WIDTH   = PAPER_WIDTH - 2*VIEWPORT_PADDING,
       VIEWPORT_HEIGHT  = 660,
 
+      VP_SHRUNK_HEIGHT = 200,
+
       HIGHLIGHT_RADIUS = 40,
 
       CXN_WINDOW_HEIGHT = VIEWPORT_HEIGHT - 2*HIGHLIGHT_RADIUS,
 
-      ANIM_DURATION    = 500,
+      ANIM_DURATION    = 1000,
       BIG_RADIUS       = 40, // radius threshold for always showing labels
 
       cmpyCircles      = {}, // all company circles created up to this point
       cxnCircles       = {}, // all connection circles created up to this point
       currCmpys        = [], // the circles currently drawn in the viewport
-      currSchools      = [], // the circles currently drawn in the viewport
       currCxns         = [], // the circles currently drawn in the viewport
       isDragging       = false,
       isHighlighting   = false, // are we highlighting a circle?
@@ -57,14 +58,14 @@ var NetworkGraph;
       return this.xInBounds(x, r) && this.yInBounds(y, r);
     },
 
-    xInBounds: function(x, r) {
+    xInBounds: function(x, r, parent) {
       return (x - r) > 0 &&
              (x + r) < VIEWPORT_WIDTH;
     },
 
-    yInBounds: function(y, r) {
+    yInBounds: function(y, r, parent) {
       return (y - r) > 0 &&
-             (y + r) < VIEWPORT_HEIGHT;
+             (y + r) < (isHighlighting ? VP_SHRUNK_HEIGHT : VIEWPORT_HEIGHT);
     },
 
     // getRandomCenter
@@ -73,7 +74,7 @@ var NetworkGraph;
     // completely within the boundaries of the canvas.
     getRandomCenter: function(radius) {
       var cx = Math.floor(Math.random()*(VIEWPORT_WIDTH)),
-          cy = Math.floor(Math.random()*(VIEWPORT_HEIGHT));
+          cy = Math.floor(Math.random()*(isHighlighting ? VP_SHRUNK_HEIGHT : VIEWPORT_HEIGHT));
 
       return GraphUtils.moveAwayFromEdge(cx, cy, radius);
     },
@@ -93,10 +94,11 @@ var NetworkGraph;
     },
 
     moveAwayFromEdge: function(cx, cy, r) {
-      var left   = cx - r,
-          right  = cx + r,
-          top    = cy - r,
-          bottom = cy + r;
+      var left     = cx - r,
+          right    = cx + r,
+          top      = cy - r,
+          bottom   = cy + r,
+          vpHeight = isHighlighting ? VP_SHRUNK_HEIGHT : VIEWPORT_HEIGHT;
 
       if (left <= 0) {
         cx = r;
@@ -107,8 +109,8 @@ var NetworkGraph;
       if (top <= 0) {
         cy = r;
       }
-      else if (bottom > VIEWPORT_HEIGHT) {
-        cy = VIEWPORT_HEIGHT - r;
+      else if (bottom > vpHeight) {
+        cy = vpHeight - r;
       }
 
       return { x: cx,
@@ -234,7 +236,7 @@ var NetworkGraph;
           hypot      = Math.sqrt(diffX*diffX + diffY*diffY),
           angle      = Math.asin(diffY/hypot),
           newHypot   = Math.max(rad*3/2, 30) + this.r,
-          angleIncrements = [Math.PI/2, (-1)*Math.PI/2, Math.PI],
+          angleIncrements = [pi/6, pi/4, pi/3, pi/2, 2*pi/3, 3*pi/4, 5*pi/6, pi],
           newCenter, i, len, newX, newY, tmpAngle;
 
       // Handle some ambiguous cases.
@@ -258,6 +260,12 @@ var NetworkGraph;
           break;
         }
         tmpAngle = angle + angleIncrements[i++];
+        newX     = cx + Math.cos(tmpAngle)*newHypot,
+        newY     = cy + Math.sin(tmpAngle)*newHypot * (-1); // flip to right side up
+        if (GraphUtils.isInBounds(newX, newY, this.r)) {
+          break;
+        }
+        tmpAngle = angle - angleIncrements[i++];
         newX     = cx + Math.cos(tmpAngle)*newHypot,
         newY     = cy + Math.sin(tmpAngle)*newHypot * (-1); // flip to right side up
       }
@@ -506,7 +514,7 @@ var NetworkGraph;
           newRadius = this.calculateCmpyRadius(employees.length),
           cx = this.cx,
           cy = this.cy,
-          point;
+          opacity, point;
 
       this.employees = employees;
       this.pictures = [];
@@ -516,9 +524,9 @@ var NetworkGraph;
         point = GraphUtils.moveAwayFromEdge(cx, cy, newRadius);
         cx = point.x;
         cy = point.y;
-      }
 
-      this.move(cx, cy);
+        this.move(cx, cy);
+      }
 
       if (this.r !== newRadius) {
         this.setRadius(newRadius);
@@ -526,9 +534,16 @@ var NetworkGraph;
           top: (newRadius-8) + 'px',
           left: (newRadius-100) + 'px'
         });
+        this.setOpacity();
       }
 
       return this;
+    },
+
+    setOpacity: function() {
+      var opacity = -1000/(this.r+10) + 110;
+      opacity = Math.min(opacity, 100); // upper limit of 100
+      this.$circle.css('opacity', opacity/100);
     },
 
     resetLabelPosition: function() {
@@ -540,11 +555,9 @@ var NetworkGraph;
       //if (isDragging) {
         //return;
       //}
-      if (!isHighlighting) {
-        this.$container.addClass('hover');
-        this.$label.show();
-        this.moveOverlapCircles();
-      }
+      this.$container.addClass('hover');
+      this.$label.show();
+      this.moveOverlapCircles();
     },
 
     doHoverOut: function() {
@@ -561,8 +574,13 @@ var NetworkGraph;
           this.highlight();
           highlightedCirc = this;
         }
-        else {
+        else if (this == highlightedCirc) {
           this.unhighlight();
+        }
+        else {
+          // clicked on a circle that wasn't highlighted
+          highlightedCirc.unhighlight();
+          // TODO: swich highlights;
         }
         $window.trigger('circleClick', this);
       }
@@ -662,18 +680,18 @@ var NetworkGraph;
     highlight: function() {
       var plural = this.employees.length !== 1;
       this.loadEmployees();
-      this.origCx = this.cx;
-      this.origCy = this.cy;
-      this.origR = this.r;
-      this.setRadius(HIGHLIGHT_RADIUS, false);
+      //this.origCx = this.cx;
+      //this.origCy = this.cy;
+      //this.origR = this.r;
+      //this.setRadius(HIGHLIGHT_RADIUS, false);
       this.$label.hide();
       $cmpyTitle.text([this.employees.length, 'connection' + (plural ? 's' : ''), 'at', this.name].join(' '));
-      this.move(HIGHLIGHT_RADIUS, HIGHLIGHT_RADIUS, (function() {
+      //this.move(HIGHLIGHT_RADIUS, HIGHLIGHT_RADIUS, (function() {
         this.$container.addClass('highlighted');
         //this.moveOverlapCircles();
         this.showEmployees();
-        this.addBackButton();
-      }).bind(this));
+        //this.addBackButton();
+      //}).bind(this));
       this.$container.draggable('option', 'disabled', true);
     },
 
@@ -695,7 +713,7 @@ var NetworkGraph;
       $viewport.removeClass('highlighting');
     },
 
-    positionEl: function(x, y, r) {
+    setElPosition: function(x, y, r) {
       this.cx = x;
       this.cy = y;
       this.$container.css({
@@ -719,7 +737,7 @@ var NetworkGraph;
                     radius,
                     cmpyName, // label
                     'cmpy')  // circle type
-          .positionEl(x, y, radius);
+          .setElPosition(x, y, radius);
 
       this.$circle.click(this.doClick.bind(this))
                   .hover(this.doHoverIn.bind(this),
@@ -730,6 +748,8 @@ var NetworkGraph;
                        containment: 'parent',
                        stop: this.doDragStop.bind(this)
                      });
+
+      this.setOpacity();
 
       if (radius >= BIG_RADIUS) {
         this.$label.show();
@@ -819,8 +839,38 @@ var NetworkGraph;
       currCmpys = tmpCmpys;
     },
 
+    resizeArea: function() {
+      var viewportHeight = isHighlighting ? VP_SHRUNK_HEIGHT : VIEWPORT_HEIGHT, i = 0;
+
+      this.$viewport.css('height', viewportHeight + 'px');
+
+      currCmpys.forEach(function(cmpyCirc) {
+        var top, yRatio, newY;
+
+        if (isHighlighting) {
+          cmpyCirc.origCy = cmpyCirc.cy;
+          top    = cmpyCirc.cy - cmpyCirc.r;
+          yRatio = top / VIEWPORT_HEIGHT;
+          newY   = VP_SHRUNK_HEIGHT * yRatio + cmpyCirc.r;
+
+          if (newY + cmpyCirc.r >= VP_SHRUNK_HEIGHT) {
+            newY = VP_SHRUNK_HEIGHT - cmpyCirc.r;
+          }
+        }
+        else { // not highlighting; restore to full size.
+          if (i++ == 0) {
+            console.log(cmpyCirc.origCy);
+          }
+          newY = cmpyCirc.origCy; // TODO: THIS ISN'T WORKING
+        }
+
+        cmpyCirc.setElPosition(cmpyCirc.cx, newY, cmpyCirc.r);
+      });
+    },
+
     init: function() {
       this.$el = $('#companies');
+      $window.on('circleClick', this.resizeArea.bind(this));
     }
   };
 
@@ -844,7 +894,7 @@ var NetworkGraph;
       this.cmpyCollection = new CompanyCollection();
       //this.cxnCollection  = new ConnectionCollection();
 
-      $window.on('circleClick', this.fadeOtherCircles.bind(this));
+      //$window.on('circleClick', this.fadeOtherCircles.bind(this));
     },
 
     setCompanies: function(companies, schools) {

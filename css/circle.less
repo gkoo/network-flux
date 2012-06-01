@@ -38,7 +38,6 @@
 }
 
 .circle {
-  border: 1px solid #000;
   .transition-all;
 }
 
@@ -52,12 +51,22 @@
   }
 
   &.school .cmpy-circ {
-    /*background-color: #f00;*/
+    background-color: #f00;
+  }
+
+  &.highlighted {
+    .cmpy-circ {
+      background-color: #0f0;
+    }
+
+    .cmpy-label {
+      display: block;
+    }
   }
 }
 
 .cmpy-circ {
-  background-color: #eee;
+  background-color: #1b587e;
   position: relative;
 }
 

@@ -68,12 +68,15 @@ body {
   display: none;
   margin: @viewportPadding;
   height: @viewportHeight;
-  position: relative;
+  //position: relative;
   text-align: center;
 }
 
 #companies {
+  /*background: #f66;*/
   height: @viewportHeight;
+  position: relative;
+  .transition(height);
 }
 
 #connections {
