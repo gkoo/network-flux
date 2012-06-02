@@ -171,6 +171,9 @@ $(function() {
   onLinkedInAuth = function() {
     var fields = ["id", "first-name", "last-name","positions:(start-date,end-date,company:(id,name))","picture-url","educations:(school-name,start-date,end-date)","site-standard-profile-request:(url)"];
     GordonUtils.fadeOut($signinEl, ANIM_DURATION);
+    setTimeout(function() {
+      GordonUtils.fadeIn($('#companies'));
+    }, ANIM_DURATION);
     $('#viewport').show();
     if (DO_PROCESSING) {
       // get own profile

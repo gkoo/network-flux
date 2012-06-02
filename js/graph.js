@@ -27,7 +27,7 @@ var NetworkGraph;
 
       HIGHLIGHT_RADIUS = 40,
 
-      CXN_WINDOW_HEIGHT = VIEWPORT_HEIGHT - 2*HIGHLIGHT_RADIUS,
+      CXN_WINDOW_HEIGHT = VIEWPORT_HEIGHT - VP_SHRUNK_HEIGHT,
 
       ANIM_DURATION    = 1000,
       BIG_RADIUS       = 40, // radius threshold for always showing labels
@@ -35,7 +35,6 @@ var NetworkGraph;
       cmpyCircles      = {}, // all company circles created up to this point
       cxnCircles       = {}, // all connection circles created up to this point
       currCmpys        = [], // the circles currently drawn in the viewport
-      currCxns         = [], // the circles currently drawn in the viewport
       isDragging       = false,
       isHighlighting   = false, // are we highlighting a circle?
       highlightedCirc,
@@ -382,6 +381,7 @@ var NetworkGraph;
 
   ConnectionCircle.prototype = new NetworkCircle();
 
+  // TODO: remove Raphael drag functions?
   GordonUtils.extend(ConnectionCircle.prototype, {
     init: function(profile) {
       var r       = 40, // profile pic is 80x80
@@ -476,12 +476,6 @@ var NetworkGraph;
       return inBounds && (y + this.IMG_DIM <= VIEWPORT_HEIGHT/2 - midCircR ||
                           y <= VIEWPORT_HEIGHT/2 + midCircR);
     },
-
-    // Curries the NetworkCircle.moveOverlapCircles function with currCxns
-    // (specifies that we want to compare this circle against other cxn circles)
-    moveOverlapCircles: function() {
-      return this.moveOverlapCirclesProto.call(this, currCxns);
-    }
   });
 
   CompanyCircle = function(id, cmpyEmployees, cmpyName, isSchool) {
@@ -534,7 +528,7 @@ var NetworkGraph;
           top: (newRadius-8) + 'px',
           left: (newRadius-100) + 'px'
         });
-        this.setOpacity();
+        //this.setOpacity();
       }
 
       return this;
@@ -568,6 +562,7 @@ var NetworkGraph;
     },
 
     doClick: function(evt) {
+      console.log(this);
       if (!this.wasDragging) {
         isHighlighting = !isHighlighting;
         if (isHighlighting) {
@@ -597,7 +592,7 @@ var NetworkGraph;
     // loadEmployees
     // =============
     // Creates the ConnectionCircles, so that we can start loading images, but
-    // keeps the RaphaelJS elements hidden for now.
+    // keeps the DOM elements hidden for now.
     loadEmployees: function() {
       var self              = this,
           noPictureProfiles = [],
@@ -607,8 +602,8 @@ var NetworkGraph;
       if (cxnWindowArea/(80*80) < numEmployees) {
         // fit pictures to connections box.
         this.pictureWidth = Math.floor(Math.sqrt(VIEWPORT_WIDTH*CXN_WINDOW_HEIGHT/numEmployees)*9/10);
-        // set minimum image width to 20
-        this.pictureWidth = Math.max(20, this.pictureWidth);
+        // set minimum image width to 30
+        this.pictureWidth = Math.max(30, this.pictureWidth);
       }
       else {
         this.pictureWidth = 80;
@@ -653,63 +648,60 @@ var NetworkGraph;
         }
       }
 
-      numPerRow = Math.floor(VIEWPORT_WIDTH/this.pictureWidth);
+      numPerRow = Math.floor(CXN_WINDOW_HEIGHT/this.pictureWidth);
       numRows = Math.ceil(this.employees.length/numPerRow);
       width = (this.pictureWidth + 2) * (numPerRow > numEmployees ? numEmployees : numPerRow);
       height = numRows * (this.pictureWidth + 2); // + 2 for border
-      $connections.css({
-        top: HIGHLIGHT_RADIUS*2 + CXN_WINDOW_HEIGHT/2 - height/2 - this.pictureWidth/2,
-        left: VIEWPORT_WIDTH/2 - width/2
-      });
+      $connections.addClass('show')
+                  .css({
+                    top: HIGHLIGHT_RADIUS*2 + CXN_WINDOW_HEIGHT/2 - height/2 - this.pictureWidth/2,
+                    left: VIEWPORT_WIDTH/2 - width/2
+                  });
       GordonUtils.fadeIn($cmpyTitle);
     },
 
-    addBackButton: function() {
-      this.$circle.append($('<span>').addClass('backBtn')
-                                     .text('Back'));
-                                     //.css({
-                                       //top: HIGHLIGHT_RADIUS-5,
-                                       //position: absolute
-                                     //}));
+    hideEmployees: function() {
+      $connections.removeClass('show');
+      /*
+      if (this.pictures) {
+        this.pictures.forEach(function(cxnCirc) {
+          cxnCirc.hide();
+        });
+      }
+      */
     },
 
-    removeBackButton: function() {
-      this.$circle.children('.backBtn').remove();
-    },
-
+    // highlight
+    // =========
+    // Highlights a company and shows its employees.
     highlight: function() {
-      var plural = this.employees.length !== 1;
+      var plural = this.employees.length !== 1,
+          self = this;
       this.loadEmployees();
       //this.origCx = this.cx;
       //this.origCy = this.cy;
       //this.origR = this.r;
       //this.setRadius(HIGHLIGHT_RADIUS, false);
-      this.$label.hide();
+      this.$label.show();
       $cmpyTitle.text([this.employees.length, 'connection' + (plural ? 's' : ''), 'at', this.name].join(' '));
       //this.move(HIGHLIGHT_RADIUS, HIGHLIGHT_RADIUS, (function() {
-        this.$container.addClass('highlighted');
+      window.setTimeout(function() {
+        self.$container.addClass('highlighted');
         //this.moveOverlapCircles();
-        this.showEmployees();
-        //this.addBackButton();
+        self.showEmployees();
+      }, ANIM_DURATION);
       //}).bind(this));
       this.$container.draggable('option', 'disabled', true);
     },
 
     unhighlight: function() {
       // move back to original position
-      this.move(this.origCx, this.origCy);
-      this.setRadius(this.origR);
+      //this.move(this.origCx, this.origCy);
       this.$container.removeClass('highlighted')
                      .draggable('option', 'disabled', false);
-      this.removeBackButton();
       GordonUtils.fadeOut($cmpyTitle, ANIM_DURATION);
 
-      if (this.pictures) {
-        this.pictures.forEach(function(cxnCirc) {
-          cxnCirc.hide();
-        });
-        currCxns = [];
-      }
+      this.hideEmployees();
       $viewport.removeClass('highlighting');
     },
 
@@ -743,13 +735,16 @@ var NetworkGraph;
                   .hover(this.doHoverIn.bind(this),
                          this.doHoverOut.bind(this));
 
+      // Weird. I think jQuery sets position to relative, when specifying
+      // top and left, so need to explicitly set position: absolute.
       this.$container.addClass(isSchool ? 'school' : '')
-                     .css('position', 'absolute').draggable({
+                     .css('position', 'absolute')
+                     .draggable({
                        containment: 'parent',
                        stop: this.doDragStop.bind(this)
                      });
 
-      this.setOpacity();
+      //this.setOpacity();
 
       if (radius >= BIG_RADIUS) {
         this.$label.show();
@@ -840,17 +835,19 @@ var NetworkGraph;
     },
 
     resizeArea: function() {
-      var viewportHeight = isHighlighting ? VP_SHRUNK_HEIGHT : VIEWPORT_HEIGHT, i = 0;
+      var viewportHeight = isHighlighting ? VP_SHRUNK_HEIGHT : VIEWPORT_HEIGHT;
 
       this.$viewport.css('height', viewportHeight + 'px');
 
       currCmpys.forEach(function(cmpyCirc) {
-        var top, yRatio, newY;
+        var top, yRatio, newX, newY;
 
         if (isHighlighting) {
+          cmpyCirc.origCx = cmpyCirc.cx;
           cmpyCirc.origCy = cmpyCirc.cy;
           top    = cmpyCirc.cy - cmpyCirc.r;
           yRatio = top / VIEWPORT_HEIGHT;
+          newX   = cmpyCirc.cx;
           newY   = VP_SHRUNK_HEIGHT * yRatio + cmpyCirc.r;
 
           if (newY + cmpyCirc.r >= VP_SHRUNK_HEIGHT) {
@@ -858,13 +855,11 @@ var NetworkGraph;
           }
         }
         else { // not highlighting; restore to full size.
-          if (i++ == 0) {
-            console.log(cmpyCirc.origCy);
-          }
+          newX = cmpyCirc.origCx;
           newY = cmpyCirc.origCy; // TODO: THIS ISN'T WORKING
         }
 
-        cmpyCirc.setElPosition(cmpyCirc.cx, newY, cmpyCirc.r);
+        cmpyCirc.setElPosition(newX, newY, cmpyCirc.r);
       });
     },
 
@@ -892,7 +887,6 @@ var NetworkGraph;
     init: function() {
       this.sliderBar      = new GraphSliderBar();
       this.cmpyCollection = new CompanyCollection();
-      //this.cxnCollection  = new ConnectionCollection();
 
       //$window.on('circleClick', this.fadeOtherCircles.bind(this));
     },

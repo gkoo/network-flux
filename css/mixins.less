@@ -46,3 +46,9 @@
   display: none;
   opacity: 0;
 }
+
+.box-shadow(@horizontal, @vertical, @blur, @spread, @color) {
+  -moz-box-shadow:    @horizontal @vertical @blur @spread @color;
+  -webkit-box-shadow: @horizontal @vertical @blur @spread @color;
+  box-shadow:         @horizontal @vertical @blur @spread @color;
+}

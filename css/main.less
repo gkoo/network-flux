@@ -68,22 +68,26 @@ body {
   display: none;
   margin: @viewportPadding;
   height: @viewportHeight;
-  //position: relative;
+  /*position: relative;*/
   text-align: center;
 }
 
 #companies {
   /*background: #f66;*/
+  display: none;
   height: @viewportHeight;
   position: relative;
   .transition(height);
 }
 
 #connections {
-  max-height: @viewportHeight - @highlightRadius;
-  position: absolute;
-  left: 0;
-  top: @highlightRadius*2;
+  background-color: #66f;
+  display: none;
+  height: @viewportHeight - 200px;
+
+  &.show {
+    display: block;
+  }
 }
 
 #date {

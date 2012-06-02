@@ -13,7 +13,6 @@
 .circle-container {
   .transition-all;
 
-
   &.hover{
     z-index: 1000;
 
@@ -46,17 +45,15 @@
   .pointer-cursor;
   position: absolute;
 
-  &.hover .cmpy-circ {
-    background-color: #fff;
-  }
-
   &.school .cmpy-circ {
     background-color: #f00;
   }
 
   &.highlighted {
+    z-index: 999;
+
     .cmpy-circ {
-      background-color: #0f0;
+      background-color: #fff;
     }
 
     .cmpy-label {
@@ -68,6 +65,7 @@
 .cmpy-circ {
   background-color: #1b587e;
   position: relative;
+  .box-shadow(2px, 2px, 1px, 2px, #000);
 }
 
 .cmpy-label {
@@ -81,7 +79,6 @@
 
 // CONNECTION CIRCLE
 .cxn-circ-container {
-  display: none;
 }
 
 .cxn-circ {
