@@ -1,4 +1,6 @@
-var GordonUtils = {
+var GKUtils = {
+  ANIM_DURATION: 1000,
+
   /**
    * getData
    * =======
@@ -39,6 +41,14 @@ var GordonUtils = {
     setTimeout(function() {
       $el.hide();
     }, dur);
+  },
+
+  animate: function($el, props, onComplete) {
+    var ANIM_DURATION = 1000;
+    $el.css(props);
+    if (onComplete) {
+      setTimeout(onComplete, this.ANIM_DURATION);
+    }
   }
 };
 

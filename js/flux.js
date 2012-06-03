@@ -1,8 +1,3 @@
-// TODO: include duplicates for company-employee pair
-// TODO: handle no-connections case
-// TODO: check for web worker support
-//
-// http://caniuse.com/webworkers
 var onLinkedInLoad;
 
 $(function() {
@@ -75,8 +70,8 @@ $(function() {
    * My profile and connection profiles retrieved. Start processing!
    */
   processProfiles = function() {
-    var me = GordonUtils.getData(myProfile),
-        cxns = GordonUtils.getData(cxnProfiles),
+    var me = GKUtils.getData(myProfile),
+        cxns = GKUtils.getData(cxnProfiles),
         allCompanies = {},
         date, cxnWorker;
 
@@ -106,7 +101,7 @@ $(function() {
         // no-op takes around 70-100 ms
         console.log('Processing took ' + ((new Date()).getTime() - date.getTime()) + ' milliseconds');
 
-        GordonUtils.fadeIn($('#intro2, #slider, #share'));
+        GKUtils.fadeIn($('#intro2, #slider, #share'));
       }
     }, false);
 
@@ -116,12 +111,12 @@ $(function() {
   fillInName = function(profile) {
     $('#yourname').text(profile.firstName);
     setTimeout(function() {
-      GordonUtils.fadeIn($('#intro1'));
+      GKUtils.fadeIn($('#intro1'));
     }, ANIM_DURATION);
   },
 
   handleOwnProfile = function(data) {
-    var profile = GordonUtils.getData(data);
+    var profile = GKUtils.getData(data);
     if (profile && profile.length) {
       fillInName(profile[0]);
     }
@@ -161,7 +156,7 @@ $(function() {
     $(window).bind('sliderStop', getSnapshot);
     $(window).bind('sliderDrag', updateDate);
     $(window).bind('sliderStart', function() {
-      GordonUtils.fadeOut($('.intro'), ANIM_DURATION);
+      GKUtils.fadeOut($('.intro'), ANIM_DURATION);
     });
 
     snapshotWorker = new Worker('js/snapshotWorker.js');
@@ -170,9 +165,9 @@ $(function() {
 
   onLinkedInAuth = function() {
     var fields = ["id", "first-name", "last-name","positions:(start-date,end-date,company:(id,name))","picture-url","educations:(school-name,start-date,end-date)","site-standard-profile-request:(url)"];
-    GordonUtils.fadeOut($signinEl, ANIM_DURATION);
+    GKUtils.fadeOut($signinEl, ANIM_DURATION);
     setTimeout(function() {
-      GordonUtils.fadeIn($('#companies'));
+      GKUtils.fadeIn($('#companies'));
     }, ANIM_DURATION);
     $('#viewport').show();
     if (DO_PROCESSING) {
@@ -187,7 +182,7 @@ $(function() {
   };
 
   onLinkedInLoad = function() {
-    GordonUtils.fadeIn($('#signin, #title'));
+    GKUtils.fadeIn($('#signin, #title'));
     IN.Event.on(IN, "auth", onLinkedInAuth);
   };
 

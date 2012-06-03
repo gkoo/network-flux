@@ -28,7 +28,7 @@ var NetworkGraph;
 
       CXN_WINDOW_HEIGHT = VIEWPORT_HEIGHT - VP_SHRUNK_HEIGHT,
 
-      ANIM_DURATION    = 1000,
+      ANIM_DURATION    = GKUtils.ANIM_DURATION || 1000,
       BIG_RADIUS       = 40, // radius threshold for always showing labels
 
       cmpyCircles      = {}, // all company circles created up to this point
@@ -171,10 +171,7 @@ var NetworkGraph;
       this.cx = cx;
       this.cy = cy;
 
-      this.$container.css(coords);
-      if (onComplete) {
-        setTimeout(onComplete, ANIM_DURATION);
-      }
+      GKUtils.animate(this.$container, coords, onComplete);
       return this;
     },
 
@@ -262,7 +259,7 @@ var NetworkGraph;
       newY = cy + Math.sin(angle)*newHypot * (-1); // flip to right side up
 
       // Handle circle flying out of bounds.
-      // Try going right 90 degrees, then left 90 degrees, then 180.
+      // Try adjusting angle incrementally and see if it is in bounds.
       for (i = 0, len = angleIncrements.length; i < len; ++i) {
         if (GraphUtils.isInBounds(newX, newY, this.r)) {
           break;
@@ -348,7 +345,6 @@ var NetworkGraph;
         isHighlighting = false;
         highlightedCirc.unhighlight();
         isAnimating = true;
-        $window.trigger('circleClick');
         $window.trigger('unhighlight');
       }
 
@@ -392,7 +388,7 @@ var NetworkGraph;
 
   ConnectionCircle.prototype = new NetworkCircle();
 
-  GordonUtils.extend(ConnectionCircle.prototype, {
+  GKUtils.extend(ConnectionCircle.prototype, {
     init: function(profile) {
       var r       = 40, // profile pic is 80x80
           center   = GraphUtils.getRandomCenter(r),
@@ -419,11 +415,20 @@ var NetworkGraph;
     },
 
     show: function() {
-      this.$container.css('top', this.top);
+      var self = this;
+      this.$container.show();
+      setTimeout(function() {
+        self.$container.css('top', self.top);
+      }, 50);
     },
 
     hide: function() {
-      this.$container.css('top', CXN_WINDOW_HEIGHT);
+      var self = this;
+      GKUtils.animate(this.$container, {
+        top: CXN_WINDOW_HEIGHT
+      }, function() {
+        self.$container.hide();
+      });
     },
 
     setCenter: function(cx, cy) {
@@ -464,7 +469,7 @@ var NetworkGraph;
 
   CompanyCircle.prototype = new NetworkCircle();
 
-  GordonUtils.extend(CompanyCircle.prototype, {
+  GKUtils.extend(CompanyCircle.prototype, {
     calculateCmpyRadius: function(cmpySize) {
       // Formula: y = -1000/(x+10) + 100
       // http://www.mathsisfun.com/data/function-grapher.php
@@ -507,16 +512,9 @@ var NetworkGraph;
           top: (newRadius-8) + 'px',
           left: (newRadius-100) + 'px'
         });
-        //this.setOpacity();
       }
 
       return this;
-    },
-
-    setOpacity: function() {
-      var opacity = -1000/(this.r+10) + 110;
-      opacity = Math.min(opacity, 100); // upper limit of 100
-      this.$circle.css('opacity', opacity/100);
     },
 
     resetLabelPosition: function() {
@@ -543,7 +541,6 @@ var NetworkGraph;
     },
 
     doClick: function(evt) {
-      var self = this;
       if (!this.wasDragging && !isAnimating) { // need to check wasDragging
                                                // because drag triggers a click too. =(
         isHighlighting = !isHighlighting;
@@ -552,26 +549,28 @@ var NetworkGraph;
           this.highlight();
           highlightedCirc = this;
           isAnimating = true;
-          $window.trigger('loadEmployees', { employees: this.employees });
 
-          // Only reveal connection pictures once we've resized company view
-          setTimeout(function() {
-            $window.trigger('showEmployees');
-          }, ANIM_DURATION);
+          // need to pass in an object because of how jQuery handles event data
+          $window.trigger('highlight', { employees: this.employees });
         }
 
-        else if (this == highlightedCirc) {
-          this.unhighlight();
+        else { // unhighlight currently highlighted company
           isAnimating = true;
-          $window.trigger('unhighlight');
-        }
-
-        else {
-          // clicked on a circle that wasn't highlighted
           highlightedCirc.unhighlight();
-          // TODO: swich highlights;
+
+          if (this == highlightedCirc) {
+            $window.trigger('unhighlight');
+          }
+
+          else {
+            // Clicked on a circle that wasn't highlighted
+            // Just stay highlighting and switch the circle
+            isHighlighting = true;
+            this.highlight();
+            highlightedCirc = this;
+            $window.trigger('replaceEmployees', { employees: this.employees });
+          }
         }
-        $window.trigger('circleClick', this);
       }
       this.wasDragging = false;
     },
@@ -587,30 +586,18 @@ var NetworkGraph;
     // =========
     // Highlights a company and shows its employees.
     highlight: function() {
-      var plural = this.employees.length !== 1,
-          self = this;
-      //this.origCx = this.cx;
-      //this.origCy = this.cy;
-      //this.origR = this.r;
-      //this.setRadius(HIGHLIGHT_RADIUS, false);
+      var self = this;
       this.$label.show();
-      $cmpyTitle.text([this.employees.length, 'connection' + (plural ? 's' : ''), 'at', this.name].join(' '));
-      //this.move(HIGHLIGHT_RADIUS, HIGHLIGHT_RADIUS, (function() {
       window.setTimeout(function() {
         self.$container.addClass('highlighted');
-        //this.moveOverlapCircles();
-        //self.showEmployees();
       }, ANIM_DURATION);
-      //}).bind(this));
     },
 
     unhighlight: function() {
       // move back to original position
       //this.move(this.origCx, this.origCy);
       this.$container.removeClass('highlighted');
-      GordonUtils.fadeOut($cmpyTitle, ANIM_DURATION);
-
-      $viewport.removeClass('highlighting');
+      GKUtils.fadeOut($cmpyTitle, ANIM_DURATION);
     },
 
     init: function(id, cmpyEmployees, cmpyName, isSchool) {
@@ -721,13 +708,13 @@ var NetworkGraph;
           // This circle is part of the next view. Don't hide, just resize.
           cmpyCircle.setEmployees(employees);
           tmpCmpys.push(cmpyCircle);
-          companies[cmpyCircle.id] = 0; // we don't need to render this company
+          companies[cmpyCircle.id] = null; // we don't need to render this company
         }
         else if (schoolmates) {
           // This circle is part of the next view. Don't hide, just resize.
           cmpyCircle.setEmployees(schoolmates);
           tmpCmpys.push(cmpyCircle);
-          companies[cmpyCircle.id] = 0; // we don't need to render this company
+          schools[cmpyCircle.id] = null; // we don't need to render this company
         }
         else {
           // This circle is not part of the next view. Hide.
@@ -743,9 +730,17 @@ var NetworkGraph;
     },
 
     resizeArea: function() {
-      var viewportHeight = isHighlighting ? VP_SHRUNK_HEIGHT : VIEWPORT_HEIGHT;
+      var viewportHeight = isHighlighting ? VP_SHRUNK_HEIGHT : VIEWPORT_HEIGHT,
+          onComplete;
 
-      this.$viewport.css('height', viewportHeight + 'px');
+      if (isHighlighting) {
+        onComplete = function() { // onComplete callback
+          $window.trigger('showEmployees');
+        };
+      }
+      GKUtils.animate(this.$viewport, {
+        height: viewportHeight + 'px'
+      }, onComplete);
 
       currCmpys.forEach(function(cmpyCirc) {
         var top, yRatio, newX, newY;
@@ -771,24 +766,20 @@ var NetworkGraph;
       });
     },
 
-    // Wrapper just used to check if we should wait for animation to complete first.
-    resizeAreaWrapper: function() {
-      if (isHighlighting) {
-        this.resizeArea();
-      }
-      else {
-        setTimeout(this.resizeArea.bind(this), ANIM_DURATION);
-        setTimeout(function() {
-          isAnimating = false;
-          $window.trigger('animComplete');
-        }, ANIM_DURATION);
-      }
+    // Wrapper just used to wait for animation to complete first.
+    resizeAreaDelayed: function() {
+      setTimeout(this.resizeArea.bind(this), ANIM_DURATION);
+      setTimeout(function() {
+        isAnimating = false;
+        $window.trigger('animComplete');
+      }, ANIM_DURATION);
     },
 
     init: function() {
       var self = this;
       this.$el = $('#companies');
-      $window.on('circleClick', this.resizeAreaWrapper.bind(this));
+      $window.on('highlight', this.resizeArea.bind(this));
+      $window.on('unhighlight', this.resizeAreaDelayed.bind(this));
       $window.on('animComplete', function () {
         if (self.cmpysToRender) {
           self.renderCompanies(self.cmpysToRender.companies, self.cmpysToRender.schools);
@@ -798,18 +789,11 @@ var NetworkGraph;
     }
   };
 
-  ConnectionViewport = function() {
+  ConnectionView = function() {
     this.init();
   };
 
-  ConnectionViewport.prototype = {
-    init: function() {
-      this.$el = $('#connections');
-      $window.on('loadEmployees', this.loadEmployees.bind(this));
-      $window.on('showEmployees', this.showEmployees.bind(this));
-      $window.on('unhighlight', this.hideEmployees.bind(this));
-    },
-
+  ConnectionView.prototype = {
     pictureWidth: 80,
 
     circles: {}, // hash of all cxn circles ever created. EVER. =)
@@ -817,8 +801,8 @@ var NetworkGraph;
     currCxns: [], // array of currently displayed connections.
 
     loadEmployees: function(evt, data) {
-      var noPictureProfiles = [], // array of circles without pictureUrl's
-          employees         = data.employees,
+      //var noPictureProfiles = [], // array of circles without pictureUrl's
+      var employees         = data.employees,
           numEmployees      = employees.length,
           cxnWindowArea     = VIEWPORT_WIDTH*CXN_WINDOW_HEIGHT,
           i, len, empId, profile, cxnCircle, rowNum, colNum, numPerRow, numRows;
@@ -868,6 +852,7 @@ var NetworkGraph;
       //noPictureProfiles.forEach(function(circ) {
         //$connections.append(circ.getContainer());
       //});
+      return this;
     },
 
     showEmployees: function() {
@@ -884,14 +869,36 @@ var NetworkGraph;
       }, ANIM_DURATION);
     },
 
-    hideEmployees: function() {
+    replaceEmployees: function(evt, data) {
+      var self = this;
+      this.hideEmployees(null, function() {
+        self.loadEmployees(null, data)
+            .showEmployees();
+      });
+    },
+
+    hideEmployees: function(evt, onComplete) {
       var self = this;
       this.currCxns.forEach(function(cxnCirc) {
         cxnCirc.hide();
       });
+
+      this.currCxns = [];
+
       setTimeout(function() {
         self.$el.removeClass('show');
+        if (onComplete) {
+          onComplete();
+        }
       }, ANIM_DURATION);
+    },
+
+    init: function() {
+      this.$el = $('#connections');
+      $window.on('highlight', this.loadEmployees.bind(this));
+      $window.on('showEmployees', this.showEmployees.bind(this));
+      $window.on('replaceEmployees', this.replaceEmployees.bind(this));
+      $window.on('unhighlight', this.hideEmployees.bind(this));
     }
   };
 
@@ -900,34 +907,19 @@ var NetworkGraph;
   };
 
   NetworkGraph.prototype = {
-    init: function() {
-      this.sliderBar      = new GraphSliderBar();
-      this.cmpyCollection = new CompanyCollection();
-      this.cxnViewport    = new ConnectionViewport();
-
-      //$window.on('circleClick', this.fadeOtherCircles.bind(this));
-    },
-
     setCompanies: function(companies, schools) {
       this.cmpyCollection.renderCompanies(companies, schools);
-    },
-
-    fadeOtherCircles: function() {
-      currCmpys.forEach(function(circ) {
-        if (circ.id !== highlightedCirc.id) {
-          if (isHighlighting) {
-            circ.hide();
-          }
-          else {
-            circ.show();
-          }
-        }
-      });
     },
 
     setData: function(o) {
       profileData = o.profiles || null;
       cmpyNames = o.cmpyNames || null;
+    },
+
+    init: function() {
+      this.sliderBar      = new GraphSliderBar();
+      this.cmpyCollection = new CompanyCollection();
+      this.cxnView        = new ConnectionView();
     }
   };
 })();

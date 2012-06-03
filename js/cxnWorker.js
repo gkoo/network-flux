@@ -57,8 +57,8 @@ createCmpyBuckets = function(profiles, callback) {
       profileObjs = {},
 
   profiles.forEach(function(profile) {
-    var positions = GordonUtils.getData(profile.positions),
-        educations = GordonUtils.getData(profile.educations),
+    var positions = GKUtils.getData(profile.positions),
+        educations = GKUtils.getData(profile.educations),
         STRIP_PUNC = /[^\w\d-_]/gi,
         companyId, schoolNameStripped, startDate;
 
