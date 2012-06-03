@@ -3,7 +3,6 @@ var NetworkGraph;
 (function() {
   var $window          = $(window),
       $viewport        = $('#viewport'),
-      $connections     = $('#connections'),
       $cmpyTitle       = $('#companyTitle'),
       PAPER_WIDTH      = 950,
       PAPER_HEIGHT     = 750,
@@ -33,10 +32,10 @@ var NetworkGraph;
       BIG_RADIUS       = 40, // radius threshold for always showing labels
 
       cmpyCircles      = {}, // all company circles created up to this point
-      cxnCircles       = {}, // all connection circles created up to this point
       currCmpys        = [], // the circles currently drawn in the viewport
       isDragging       = false,
       isHighlighting   = false, // are we highlighting a circle?
+      isAnimating      = false, // are we currently in the middle of an animation?
       highlightedCirc,
       profileData,
       cmpyNames,
@@ -215,6 +214,16 @@ var NetworkGraph;
       return this;
     },
 
+    setElPosition: function(x, y, r) {
+      this.cx = x;
+      this.cy = y;
+      this.$container.css({
+        left: this.cx-r,
+        top:  this.cy-r
+      });
+      return this;
+    },
+
     // findOpenSpace
     // =============
     // Moves a background circle out of the way of the currently highlighted
@@ -338,7 +347,9 @@ var NetworkGraph;
       if (isHighlighting && highlightedCirc) {
         isHighlighting = false;
         highlightedCirc.unhighlight();
+        isAnimating = true;
         $window.trigger('circleClick');
+        $window.trigger('unhighlight');
       }
 
       left = ui.position.left;
@@ -381,7 +392,6 @@ var NetworkGraph;
 
   ConnectionCircle.prototype = new NetworkCircle();
 
-  // TODO: remove Raphael drag functions?
   GordonUtils.extend(ConnectionCircle.prototype, {
     init: function(profile) {
       var r       = 40, // profile pic is 80x80
@@ -409,39 +419,11 @@ var NetworkGraph;
     },
 
     show: function() {
-      this.$container.css('display', 'inline-block');
+      this.$container.css('top', this.top);
     },
 
-    doDrag: function(dx, dy) {
-      var newX, newY, el;
-      if (isDragging) {
-        el = this.el;
-        newX = this.mouseDownX + dx;
-        newY = this.mouseDownY + dy;
-        if (this.xInBounds(newX)) {
-          el.attr({ 'x': newX });
-        }
-        if (this.yInBounds(newY)) {
-          el.attr({ 'y': newY });
-        }
-      }
-    },
-
-    doDragStart: function() {
-      var el = this.el;
-
-      this.mouseDownX = el.attr('x');
-      this.mouseDownY = el.attr('y');
-
-      isDragging = true;
-      el.stop();
-    },
-
-    doDragStop: function() {
-      if (isDragging) {
-        this.moveOverlapCircles();
-        isDragging = false;
-      }
+    hide: function() {
+      this.$container.css('top', CXN_WINDOW_HEIGHT);
     },
 
     setCenter: function(cx, cy) {
@@ -460,22 +442,20 @@ var NetworkGraph;
       return this;
     },
 
-    xInBounds: function(x) {
-      var midCircR = highlightedCirc.el.attr('r'),
-          inBounds = (x >= 0 && x + this.IMG_DIM <= VIEWPORT_WIDTH);
-
-      return inBounds && (x + this.IMG_DIM <= VIEWPORT_WIDTH/2 - midCircR &&
-                          x <= VIEWPORT_WIDTH/2 + midCircR);
-    },
-
-    yInBounds: function(y) {
-      var midCircR = highlightedCirc.el.attr('r'),
-          inBounds = (y >= 0 &&
-                      y + this.IMG_DIM <= VIEWPORT_HEIGHT);
-
-      return inBounds && (y + this.IMG_DIM <= VIEWPORT_HEIGHT/2 - midCircR ||
-                          y <= VIEWPORT_HEIGHT/2 + midCircR);
-    },
+    /**
+     * prepareElPosition
+     * =================
+     * Calculate where the connection circle will ultimately be positioned
+     * and set it up with the proper positioning.
+     *
+     * Assume that rowNum and colNum have already been set.
+     */
+    prepareElPosition: function(numPerRow, numRows) {
+      var picWidth = this.r * 2;
+      this.top  = this.rowNum * picWidth;
+      this.left = this.colNum * picWidth;
+      this.setElPosition(this.left + this.r, CXN_WINDOW_HEIGHT + this.r, this.r);
+    }
   });
 
   CompanyCircle = function(id, cmpyEmployees, cmpyName, isSchool) {
@@ -511,7 +491,6 @@ var NetworkGraph;
           opacity, point;
 
       this.employees = employees;
-      this.pictures = [];
 
       // recheck bounds when resizing circle
       if (!GraphUtils.isInBounds(cx, cy, newRadius)) {
@@ -549,9 +528,11 @@ var NetworkGraph;
       //if (isDragging) {
         //return;
       //}
-      this.$container.addClass('hover');
-      this.$label.show();
-      this.moveOverlapCircles();
+      if (!isAnimating) {
+        this.$container.addClass('hover');
+        this.$label.show();
+        this.moveOverlapCircles();
+      }
     },
 
     doHoverOut: function() {
@@ -562,16 +543,29 @@ var NetworkGraph;
     },
 
     doClick: function(evt) {
-      console.log(this);
-      if (!this.wasDragging) {
+      var self = this;
+      if (!this.wasDragging && !isAnimating) { // need to check wasDragging
+                                               // because drag triggers a click too. =(
         isHighlighting = !isHighlighting;
+
         if (isHighlighting) {
           this.highlight();
           highlightedCirc = this;
+          isAnimating = true;
+          $window.trigger('loadEmployees', { employees: this.employees });
+
+          // Only reveal connection pictures once we've resized company view
+          setTimeout(function() {
+            $window.trigger('showEmployees');
+          }, ANIM_DURATION);
         }
+
         else if (this == highlightedCirc) {
           this.unhighlight();
+          isAnimating = true;
+          $window.trigger('unhighlight');
         }
+
         else {
           // clicked on a circle that wasn't highlighted
           highlightedCirc.unhighlight();
@@ -589,95 +583,12 @@ var NetworkGraph;
       this.moveOverlapCircles();
     },
 
-    // loadEmployees
-    // =============
-    // Creates the ConnectionCircles, so that we can start loading images, but
-    // keeps the DOM elements hidden for now.
-    loadEmployees: function() {
-      var self              = this,
-          noPictureProfiles = [],
-          numEmployees      = this.employees.length,
-          cxnWindowArea     = VIEWPORT_WIDTH*CXN_WINDOW_HEIGHT;
-
-      if (cxnWindowArea/(80*80) < numEmployees) {
-        // fit pictures to connections box.
-        this.pictureWidth = Math.floor(Math.sqrt(VIEWPORT_WIDTH*CXN_WINDOW_HEIGHT/numEmployees)*9/10);
-        // set minimum image width to 30
-        this.pictureWidth = Math.max(30, this.pictureWidth);
-      }
-      else {
-        this.pictureWidth = 80;
-      }
-
-      this.employees.forEach(function(empId) {
-        var profile = profileData[empId],
-            cxnCircle;
-
-        cxnCircle = cxnCircles[profile.id];
-        if (!cxnCircle) {
-          cxnCircle = new ConnectionCircle(profile);
-          cxnCircles[profile.id] = cxnCircle;
-          if (profile.pictureUrl) {
-            $connections.append(cxnCircle.getContainer());
-          }
-          else {
-            noPictureProfiles.push(cxnCircle);
-          }
-        }
-        cxnCircle.setRadius(self.pictureWidth/2, false, false)
-                 .setImageWidth(self.pictureWidth);
-        self.pictures.push(cxnCircle);
-      });
-
-      // Add pictures with no profiles to DOM last.
-      noPictureProfiles.forEach(function(circ) {
-        $connections.append(circ.getContainer());
-      });
-    },
-
-    // showEmployees
-    // =============
-    // Reveals the ConnectionCircles
-    showEmployees: function() {
-      var numEmployees = this.employees.length,
-          i, len, numPerRow, numRows, width, height;
-
-      if (this.pictures) {
-        for (i = 0, len = this.pictures.length; i < len; ++i) {
-          this.pictures[i].show();
-        }
-      }
-
-      numPerRow = Math.floor(CXN_WINDOW_HEIGHT/this.pictureWidth);
-      numRows = Math.ceil(this.employees.length/numPerRow);
-      width = (this.pictureWidth + 2) * (numPerRow > numEmployees ? numEmployees : numPerRow);
-      height = numRows * (this.pictureWidth + 2); // + 2 for border
-      $connections.addClass('show')
-                  .css({
-                    top: HIGHLIGHT_RADIUS*2 + CXN_WINDOW_HEIGHT/2 - height/2 - this.pictureWidth/2,
-                    left: VIEWPORT_WIDTH/2 - width/2
-                  });
-      GordonUtils.fadeIn($cmpyTitle);
-    },
-
-    hideEmployees: function() {
-      $connections.removeClass('show');
-      /*
-      if (this.pictures) {
-        this.pictures.forEach(function(cxnCirc) {
-          cxnCirc.hide();
-        });
-      }
-      */
-    },
-
     // highlight
     // =========
     // Highlights a company and shows its employees.
     highlight: function() {
       var plural = this.employees.length !== 1,
           self = this;
-      this.loadEmployees();
       //this.origCx = this.cx;
       //this.origCy = this.cy;
       //this.origR = this.r;
@@ -688,31 +599,18 @@ var NetworkGraph;
       window.setTimeout(function() {
         self.$container.addClass('highlighted');
         //this.moveOverlapCircles();
-        self.showEmployees();
+        //self.showEmployees();
       }, ANIM_DURATION);
       //}).bind(this));
-      this.$container.draggable('option', 'disabled', true);
     },
 
     unhighlight: function() {
       // move back to original position
       //this.move(this.origCx, this.origCy);
-      this.$container.removeClass('highlighted')
-                     .draggable('option', 'disabled', false);
+      this.$container.removeClass('highlighted');
       GordonUtils.fadeOut($cmpyTitle, ANIM_DURATION);
 
-      this.hideEmployees();
       $viewport.removeClass('highlighting');
-    },
-
-    setElPosition: function(x, y, r) {
-      this.cx = x;
-      this.cy = y;
-      this.$container.css({
-        left: this.cx-r,
-        top:  this.cy-r
-      });
-      return this;
     },
 
     init: function(id, cmpyEmployees, cmpyName, isSchool) {
@@ -800,8 +698,18 @@ var NetworkGraph;
     },
 
     renderCompanies: function(companies, schools) {
-      var cmpyCircle, x, y, radius, cmpyEmployees,
-          tmpCmpys = []; // placeholder for currCmpys
+      var cmpyCircle, x, y, radius, cmpyEmployees, tmpCmpys;
+
+      if (isAnimating) {
+        // wait for animation to finish, then render.
+        this.cmpysToRender = {
+          companies: companies,
+          schools: schools
+        }
+        return;
+      }
+
+      tmpCmpys = []; // placeholder for currCmpys
 
       // Loop through the currently displayed companies and hide them unless
       // they are part of the next view.
@@ -856,16 +764,37 @@ var NetworkGraph;
         }
         else { // not highlighting; restore to full size.
           newX = cmpyCirc.origCx;
-          newY = cmpyCirc.origCy; // TODO: THIS ISN'T WORKING
+          newY = cmpyCirc.origCy;
         }
 
         cmpyCirc.setElPosition(newX, newY, cmpyCirc.r);
       });
     },
 
+    // Wrapper just used to check if we should wait for animation to complete first.
+    resizeAreaWrapper: function() {
+      if (isHighlighting) {
+        this.resizeArea();
+      }
+      else {
+        setTimeout(this.resizeArea.bind(this), ANIM_DURATION);
+        setTimeout(function() {
+          isAnimating = false;
+          $window.trigger('animComplete');
+        }, ANIM_DURATION);
+      }
+    },
+
     init: function() {
+      var self = this;
       this.$el = $('#companies');
-      $window.on('circleClick', this.resizeArea.bind(this));
+      $window.on('circleClick', this.resizeAreaWrapper.bind(this));
+      $window.on('animComplete', function () {
+        if (self.cmpysToRender) {
+          self.renderCompanies(self.cmpysToRender.companies, self.cmpysToRender.schools);
+          self.cmpysToRender = null;
+        }
+      });
     }
   };
 
@@ -876,6 +805,93 @@ var NetworkGraph;
   ConnectionViewport.prototype = {
     init: function() {
       this.$el = $('#connections');
+      $window.on('loadEmployees', this.loadEmployees.bind(this));
+      $window.on('showEmployees', this.showEmployees.bind(this));
+      $window.on('unhighlight', this.hideEmployees.bind(this));
+    },
+
+    pictureWidth: 80,
+
+    circles: {}, // hash of all cxn circles ever created. EVER. =)
+
+    currCxns: [], // array of currently displayed connections.
+
+    loadEmployees: function(evt, data) {
+      var noPictureProfiles = [], // array of circles without pictureUrl's
+          employees         = data.employees,
+          numEmployees      = employees.length,
+          cxnWindowArea     = VIEWPORT_WIDTH*CXN_WINDOW_HEIGHT,
+          i, len, empId, profile, cxnCircle, rowNum, colNum, numPerRow, numRows;
+
+      if (cxnWindowArea/(80*80) < numEmployees) {
+        // fit pictures to connections box.
+        this.pictureWidth = Math.floor(Math.sqrt(VIEWPORT_WIDTH*CXN_WINDOW_HEIGHT/numEmployees)*9/10);
+        // set minimum image width to 30
+        this.pictureWidth = Math.max(30, this.pictureWidth);
+      }
+      else {
+        this.pictureWidth = 80;
+      }
+
+      numPerRow = Math.floor(VIEWPORT_WIDTH / this.pictureWidth);
+      numRows   = ((employees.length - 1) / numPerRow) + 1;
+
+      for (i = 0, len = employees.length; i < len; ++i) {
+        empId = employees[i];
+        profile = profileData[empId];
+        cxnCircle = this.circles[profile.id];
+        rowNum = Math.floor(i / numPerRow);
+        colNum = i % numPerRow;
+
+        // Create the circle if it doesn't exist yet.
+        if (!cxnCircle) {
+          cxnCircle = new ConnectionCircle(profile);
+          this.circles[profile.id] = cxnCircle;
+
+          //if (profile.pictureUrl) {
+            this.$el.append(cxnCircle.getContainer());
+          //}
+          //else {
+            //noPictureProfiles.push(cxnCircle);
+          //}
+        }
+        // Set up positioning info.
+        cxnCircle.rowNum = rowNum;
+        cxnCircle.colNum = colNum;
+        cxnCircle.setRadius(this.pictureWidth/2, false, false)
+                 .setImageWidth(this.pictureWidth)
+                 .prepareElPosition(numPerRow, numRows);
+        this.currCxns.push(cxnCircle);
+      }
+
+      // Add pictures with no profiles to DOM last.
+      //noPictureProfiles.forEach(function(circ) {
+        //$connections.append(circ.getContainer());
+      //});
+    },
+
+    showEmployees: function() {
+      var self = this;
+      this.$el.addClass('show');
+      setTimeout(function() {
+        self.currCxns.forEach(function(cxnCirc) {
+          cxnCirc.show();
+        });
+      }, 50);
+      setTimeout(function() {
+        isAnimating = false;
+        $window.trigger('animComplete');
+      }, ANIM_DURATION);
+    },
+
+    hideEmployees: function() {
+      var self = this;
+      this.currCxns.forEach(function(cxnCirc) {
+        cxnCirc.hide();
+      });
+      setTimeout(function() {
+        self.$el.removeClass('show');
+      }, ANIM_DURATION);
     }
   };
 
@@ -887,6 +903,7 @@ var NetworkGraph;
     init: function() {
       this.sliderBar      = new GraphSliderBar();
       this.cmpyCollection = new CompanyCollection();
+      this.cxnViewport    = new ConnectionViewport();
 
       //$window.on('circleClick', this.fadeOtherCircles.bind(this));
     },
