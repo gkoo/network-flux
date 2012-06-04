@@ -742,11 +742,19 @@ var NetworkGraph;
       var viewportHeight = isHighlighting ? VP_SHRUNK_HEIGHT : VIEWPORT_HEIGHT,
           onComplete;
 
+      // set onComplete callback
       if (isHighlighting) {
-        onComplete = function() { // onComplete callback
+        onComplete = function() {
           $window.trigger('showEmployees');
         };
       }
+      else {
+        onComplete = function() {
+          isAnimating = false;
+          $window.trigger('animComplete');
+        };
+      }
+
       GKUtils.animate(this.$viewport, {
         height: viewportHeight + 'px'
       }, onComplete);
@@ -778,10 +786,6 @@ var NetworkGraph;
     // Wrapper just used to wait for animation to complete first.
     resizeAreaDelayed: function() {
       setTimeout(this.resizeArea.bind(this), ANIM_DURATION);
-      setTimeout(function() {
-        isAnimating = false;
-        $window.trigger('animComplete');
-      }, ANIM_DURATION);
     },
 
     init: function() {
