@@ -59,7 +59,7 @@ createCmpyBuckets = function(profiles, callback) {
   profiles.forEach(function(profile) {
     var positions = GKUtils.getData(profile.positions),
         educations = GKUtils.getData(profile.educations),
-        STRIP_PUNC = /[^\w\d-_]/gi,
+        STRIP_PUNC = /[^\w\d\-_]/gi,
         companyId, schoolNameStripped, startDate;
 
     if (positions) {

@@ -20,6 +20,7 @@ var GKUtils = {
    * Adds properties of obj2 to obj1 and returns obj1.
    */
   extend: function(obj1, obj2) {
+    var prop;
     for (prop in obj2) {
       if (obj2.hasOwnProperty(prop)) {
         obj1[prop] = obj2[prop];
@@ -59,12 +60,12 @@ if (Array && Array.prototype && typeof Array.prototype.forEach === 'undefined') 
     for (i = 0, len < this.length; i < len; ++i) {
       fn(this[i]);
     }
-  }
+  };
 }
 
 if (Object && typeof Object.keys === 'undefined') {
   Object.keys = function(o) {
-    var i = 0;
+    var i = 0, key;
     for (key in o) {
       if (o.hasOwnProperty(key)) {
         ++i;
@@ -86,9 +87,7 @@ if (Function && Function.prototype && !Function.prototype.bind) {
         fToBind = this, 
         fNOP = function () {},
         fBound = function () {
-          return fToBind.apply(this instanceof fNOP
-                                 ? this
-                                 : oThis || window,
+          return fToBind.apply(this instanceof fNOP ? this : oThis || window,
                                aArgs.concat(Array.prototype.slice.call(arguments)));
         };
 

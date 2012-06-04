@@ -2,7 +2,9 @@ var getSnapshot = function(allCmpyEmployees, targetDate) {
   var currCompanies = {},
       datePair,
       startDate,
-      endDate;
+      endDate,
+      cmpyId,
+      cxnId;
 
   for (cmpyId in allCmpyEmployees) {
     if (allCmpyEmployees.hasOwnProperty(cmpyId)) {

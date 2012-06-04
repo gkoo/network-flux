@@ -389,31 +389,6 @@ var NetworkGraph;
   ConnectionCircle.prototype = new NetworkCircle();
 
   GKUtils.extend(ConnectionCircle.prototype, {
-    init: function(profile) {
-      var r       = 40, // profile pic is 80x80
-          center   = GraphUtils.getRandomCenter(r),
-          x        = center.x - r,
-          y        = center.y - r,
-          linkEl   = $('<a>'),
-          photoUrl = profile.pictureUrl || 'img/icon_no_photo_80x80.png',
-          url      = profile.siteStandardProfileRequest ? profile.siteStandardProfileRequest.url : '#';
-
-      this.id = profile.id;
-      this.profile = profile;
-      this.createEl(profile.id,
-                    r,
-                    profile.firstName + ' ' + profile.lastName,
-                    'cxn');
-      linkEl.attr({
-        href: url || '#',
-        title: profile.firstName + ' ' + profile.lastName,
-        target: '_new'
-      });
-      linkEl.append($('<img>').addClass('cxn-picture')
-                              .attr('src', photoUrl));
-      this.$circle.append(linkEl);
-    },
-
     show: function() {
       var self = this;
       this.$container.show();
@@ -460,6 +435,40 @@ var NetworkGraph;
       this.top  = this.rowNum * picWidth;
       this.left = this.colNum * picWidth;
       this.setElPosition(this.left + this.r, CXN_WINDOW_HEIGHT + this.r, this.r);
+    },
+
+    init: function(profile) {
+      var r       = 40, // profile pic is 80x80
+          center   = GraphUtils.getRandomCenter(r),
+          x        = center.x - r,
+          y        = center.y - r,
+          linkEl   = $('<a>'),
+          photoUrl = profile.pictureUrl || 'img/icon_no_photo_80x80.png',
+          url      = profile.siteStandardProfileRequest ? profile.siteStandardProfileRequest.url : '#',
+          trans    = (Math.random()/2 + 0.5) + 's';
+
+      this.id = profile.id;
+      this.profile = profile;
+      this.createEl(profile.id,
+                    r,
+                    profile.firstName + ' ' + profile.lastName,
+                    'cxn');
+      this.$container.css({
+        '-moz-transition-duration':    trans,
+        '-ms-transition-duration':     trans,
+        '-o-transition-duration':      trans,
+        '-webkit-transition-duration': trans,
+        'transition-duration':         trans
+      });
+
+      linkEl.attr({
+        href: url || '#',
+        title: profile.firstName + ' ' + profile.lastName,
+        target: '_new'
+      });
+      linkEl.append($('<img>').addClass('cxn-picture')
+                              .attr('src', photoUrl));
+      this.$circle.append(linkEl);
     }
   });
 
@@ -473,7 +482,7 @@ var NetworkGraph;
     calculateCmpyRadius: function(cmpySize) {
       // Formula: y = -1000/(x+10) + 100
       // http://www.mathsisfun.com/data/function-grapher.php
-      var radius = 100 - (1000/(cmpySize+10))
+      var radius = 100 - (1000/(cmpySize+10));
 
       // Want radius to be minimum of 10
       return Math.max(radius, 10);
@@ -665,19 +674,19 @@ var NetworkGraph;
     },
 
     showRemainingCompanies: function(cmpysToShow, isSchool, tmpCmpys) {
-      var employees;
-      for (id in cmpysToShow) {
-        employees = cmpysToShow[id];
+      var employees, cmpyId;
+      for (cmpyId in cmpysToShow) {
+        employees = cmpysToShow[cmpyId];
 
         if (employees) {
-          cmpyCircle = cmpyCircles[id];
+          cmpyCircle = cmpyCircles[cmpyId];
           if (cmpyCircle) {
             cmpyCircle.setEmployees(employees)
                       .show();
           }
           else {
-            cmpyCircle = this.add(id, cmpysToShow[id], cmpyNames[id], isSchool);
-            cmpyCircles[id] = cmpyCircle;
+            cmpyCircle = this.add(cmpyId, cmpysToShow[cmpyId], cmpyNames[cmpyId], isSchool);
+            cmpyCircles[cmpyId] = cmpyCircle;
           }
           tmpCmpys.push(cmpyCircle);
         }
@@ -692,7 +701,7 @@ var NetworkGraph;
         this.cmpysToRender = {
           companies: companies,
           schools: schools
-        }
+        };
         return;
       }
 
