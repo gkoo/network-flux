@@ -554,6 +554,7 @@ var NetworkGraph;
                                                // because drag triggers a click too. =(
         isHighlighting = !isHighlighting;
 
+        // highlighting a circle
         if (isHighlighting) {
           this.highlight();
           highlightedCirc = this;
@@ -563,7 +564,8 @@ var NetworkGraph;
           $window.trigger('highlight', { employees: this.employees });
         }
 
-        else { // unhighlight currently highlighted company
+        // unhighlight currently highlighted company
+        else {
           isAnimating = true;
           highlightedCirc.unhighlight();
 
@@ -740,16 +742,11 @@ var NetworkGraph;
 
     resizeArea: function() {
       var viewportHeight = isHighlighting ? VP_SHRUNK_HEIGHT : VIEWPORT_HEIGHT,
-          onComplete;
+          onAnimComplete;
 
       // set onComplete callback
-      if (isHighlighting) {
-        onComplete = function() {
-          $window.trigger('showEmployees');
-        };
-      }
-      else {
-        onComplete = function() {
+      if (!isHighlighting) {
+        onAnimComplete = function() {
           isAnimating = false;
           $window.trigger('animComplete');
         };
@@ -757,7 +754,7 @@ var NetworkGraph;
 
       GKUtils.animate(this.$viewport, {
         height: viewportHeight + 'px'
-      }, onComplete);
+      }, onAnimComplete);
 
       currCmpys.forEach(function(cmpyCirc) {
         var top, yRatio, newX, newY;
@@ -783,16 +780,11 @@ var NetworkGraph;
       });
     },
 
-    // Wrapper just used to wait for animation to complete first.
-    resizeAreaDelayed: function() {
-      setTimeout(this.resizeArea.bind(this), ANIM_DURATION);
-    },
-
     init: function() {
       var self = this;
       this.$el = $('#companies');
       $window.on('highlight', this.resizeArea.bind(this));
-      $window.on('unhighlight', this.resizeAreaDelayed.bind(this));
+      $window.on('unhighlight', this.resizeArea.bind(this));
       $window.on('animComplete', function () {
         if (self.cmpysToRender) {
           self.renderCompanies(self.cmpysToRender.companies, self.cmpysToRender.schools);
@@ -865,12 +857,13 @@ var NetworkGraph;
       //noPictureProfiles.forEach(function(circ) {
         //$connections.append(circ.getContainer());
       //});
+      this.showEmployees();
       return this;
     },
 
     showEmployees: function() {
       var self = this;
-      this.$el.addClass('show');
+      this.$wrapper.addClass('show');
       setTimeout(function() {
         self.currCxns.forEach(function(cxnCirc) {
           cxnCirc.show();
@@ -899,7 +892,7 @@ var NetworkGraph;
       this.currCxns = [];
 
       setTimeout(function() {
-        self.$el.removeClass('show');
+        self.$wrapper.removeClass('show');
         if (onComplete) {
           onComplete();
         }
@@ -908,8 +901,8 @@ var NetworkGraph;
 
     init: function() {
       this.$el = $('#connections');
+      this.$wrapper = $('#connections-wrapper');
       $window.on('highlight', this.loadEmployees.bind(this));
-      $window.on('showEmployees', this.showEmployees.bind(this));
       $window.on('replaceEmployees', this.replaceEmployees.bind(this));
       $window.on('unhighlight', this.hideEmployees.bind(this));
     }

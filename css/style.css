@@ -6,9 +6,10 @@ body{font-family:Georgia, serif;text-align:center;}
 .intro{display:none;opacity:0;text-align:left;width:400px;position:absolute;-moz-transition:opacity 1s ease-out;-ms-transition:opacity 1s ease-out;-o-transition:opacity 1s ease-out;-webkit-transition:opacity 1s ease-out;transition:opacity 1s ease-out;}
 #intro1{top:100px;left:50px;}
 #intro2{bottom:0;right:50px;}#intro2 img{float:right;-moz-transform:rotate(-38deg);-ms-transform:rotate(-38deg);-o-transform:rotate(-38deg);-webkit-transform:rotate(-38deg);transform:rotate(-38deg);}
-#viewport{clear:both;display:none;margin:30px;height:660px;text-align:center;}
+#viewport{clear:both;display:none;margin:30px;height:660px;position:relative;text-align:center;}
 #companies{display:none;height:660px;position:relative;-moz-transition:height 1s ease-out;-ms-transition:height 1s ease-out;-o-transition:height 1s ease-out;-webkit-transition:height 1s ease-out;transition:height 1s ease-out;}
-#connections{display:none;height:460px;overflow:hidden;position:relative;}#connections.show{display:block;}
+#connections-wrapper{position:absolute;top:200px;left:0;width:100%;z-index:-1;}#connections-wrapper.show{z-index:10;}
+#connections{height:460px;overflow:hidden;position:relative;}
 #date{color:#ccc;font-family:Georgia,"Times New Roman",serif;font-size:156px;position:absolute;bottom:0;right:0;z-index:-1000;}
 #companyTitle{display:none;opacity:0;margin:25px 0;position:absolute;top:0;left:100px;}
 #slider{background-color:#000;display:none;height:10px;opacity:0;overflow:visible;position:relative;-moz-transition:opacity 1s ease-out;-ms-transition:opacity 1s ease-out;-o-transition:opacity 1s ease-out;-webkit-transition:opacity 1s ease-out;transition:opacity 1s ease-out;}
@@ -24,7 +25,7 @@ body{font-family:Georgia, serif;text-align:center;}
 .cmpy-circ-container.highlighted .cmpy-label{display:block;}
 .cmpy-circ{background-color:#1b587e;position:relative;-moz-box-shadow:2px 2px 1px 2px #000000;-webkit-box-shadow:2px 2px 1px 2px #000000;box-shadow:2px 2px 1px 2px #000000;}
 .cmpy-label{display:none;font-size:12px;min-width:200px;position:absolute;top:0;left:0;}
-.cxn-circ-container{position:absolute;}
+.cxn-circ-container{position:absolute;top:460px;-moz-transition:top 1s ease-out;-ms-transition:top 1s ease-out;-o-transition:top 1s ease-out;-webkit-transition:top 1s ease-out;transition:top 1s ease-out;}
 .cxn-circ{overflow:hidden;}
 .cxn-label{display:none;}
 .backBtn{position:absolute;top:30px;left:21px;}

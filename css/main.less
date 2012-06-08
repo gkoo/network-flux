@@ -68,7 +68,7 @@ body {
   display: none;
   margin: @viewportPadding;
   height: @viewportHeight;
-  /*position: relative;*/
+  position: relative;
   text-align: center;
 }
 
@@ -80,15 +80,23 @@ body {
   .transition(height);
 }
 
+#connections-wrapper {
+  position: absolute;
+  top: 200px;
+  left: 0;
+
+  width: 100%;
+  z-index: -1;
+
+  &.show {
+    z-index: 10;
+  }
+}
+
 #connections {
-  display: none;
   height: @viewportHeight - 200px;
   overflow: hidden;
   position: relative;
-
-  &.show {
-    display: block;
-  }
 }
 
 #date {
