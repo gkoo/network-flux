@@ -98,8 +98,7 @@ $(function() {
           profiles: profileObjs,
           cmpyNames: cmpyNames
         });
-        // no-op takes around 70-100 ms
-        console.log('Processing took ' + ((new Date()).getTime() - date.getTime()) + ' milliseconds');
+        //console.log('Processing took ' + ((new Date()).getTime() - date.getTime()) + ' milliseconds');
 
         GKUtils.fadeIn($('#intro2, #slider, #share'));
       }
@@ -148,7 +147,7 @@ $(function() {
 
     if (currCompanies) {
       graph.setCompanies(currCompanies, currSchools, cmpyNames);
-      console.log('Processing took ' + (date.getTime() - snapshotDate.getTime()) + ' milliseconds');
+      //console.log('Processing took ' + (date.getTime() - snapshotDate.getTime()) + ' milliseconds');
     }
   },
 

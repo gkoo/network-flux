@@ -24,8 +24,6 @@ var NetworkGraph;
 
       VP_SHRUNK_HEIGHT = 200,
 
-      HIGHLIGHT_RADIUS = 40,
-
       CXN_WINDOW_HEIGHT = VIEWPORT_HEIGHT - VP_SHRUNK_HEIGHT,
 
       ANIM_DURATION    = GKUtils.ANIM_DURATION || 1000,
@@ -33,7 +31,6 @@ var NetworkGraph;
 
       cmpyCircles      = {}, // all company circles created up to this point
       currCmpys        = [], // the circles currently drawn in the viewport
-      isDragging       = false,
       isHighlighting   = false, // are we highlighting a circle?
       isAnimating      = false, // are we currently in the middle of an animation?
       highlightedCirc,
@@ -338,6 +335,19 @@ var NetworkGraph;
       timeout = setTimeout(update, timeoutLength);
     },
 
+    /**
+     * intervalDrag
+     * ============
+     * Updates the graph on an interval, rather than waiting
+     * for the handle to stop moving. Used for the Play button.
+     */
+    intervalDrag = function(knobLeft) {
+      left = knobLeft;
+      if (!timeout) {
+        timeout = setTimeout(update, 250);
+      }
+    },
+
     handleDragStart = function(evt, ui) {
       $window.trigger('sliderStart');
       // If a circle is currently highlighted, reset the state.
@@ -367,8 +377,26 @@ var NetworkGraph;
       }
     },
 
+    doPlay = function() {
+      var totalDuration  = 12000,
+          knobRightBound = this.$el.width() - KNOB_RADIUS * 2,
+          knobLeft       = $handle.position().left,
+          duration       = (knobRightBound - knobLeft)/knobRightBound * totalDuration,
+          self           = this;
+      if (knobLeft >= knobRightBound) {
+        $handle.css('left', 0);
+      }
+      $handle.animate({ left: knobRightBound },
+      {
+        easing: 'linear',
+        duration: duration,
+        step: intervalDrag
+      });
+    },
+
     init = function() {
       this.$el = $('#slider');
+      this.$playBtn = $('#playBtn').click(doPlay.bind(this));
       $handle = this.$el.find('#sliderHandle');
       $handle.draggable({
         axis:        'x',
@@ -532,9 +560,6 @@ var NetworkGraph;
     },
 
     doHoverIn: function () {
-      //if (isDragging) {
-        //return;
-      //}
       if (!isAnimating) {
         this.$container.addClass('hover');
         this.$label.show();
