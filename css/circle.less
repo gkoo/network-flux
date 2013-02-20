@@ -1,0 +1,86 @@
+.pointer-cursor() {
+  cursor: pointer;
+  cursor: hand;
+}
+
+.highlighting {
+  .cxn-circ-container {
+    display: block;
+  }
+}
+
+// GENERIC CIRCLE
+.circle-container {
+  .transition-all;
+
+
+  &.hover{
+    z-index: 1000;
+
+    .cmpy-label {
+      display: block;
+    }
+  }
+
+  &.ui-draggable-dragging {
+    z-index: 1000;
+
+    .transition-none;
+
+    .cmpy-label {
+      display: none;
+    }
+  }
+
+  &.highlighted .cmpy-circ {
+    background-color: #fff;
+  }
+}
+
+.circle {
+  border: 1px solid #000;
+  .transition-all;
+}
+
+// COMPANY CIRCLE
+.cmpy-circ-container {
+  .pointer-cursor;
+  position: absolute;
+
+  &.hover .cmpy-circ {
+    background-color: #fff;
+  }
+}
+
+.cmpy-circ {
+  background-color: #eee;
+  position: relative;
+}
+
+.cmpy-label {
+  display: none;
+  font-size: 12px;
+  min-width: 200px;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+// CONNECTION CIRCLE
+.cxn-circ-container {
+  display: none;
+}
+
+.cxn-circ {
+  overflow: hidden;
+}
+
+.cxn-label {
+  display: none;
+}
+
+.backBtn {
+  position: absolute;
+  top: @highlightRadius - 10px;
+  left: 21px;
+}

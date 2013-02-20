@@ -1,0 +1,66 @@
+<html>
+  <head>
+    <title>Network Flux</title>
+    <link href='http://fonts.googleapis.com/css?family=Cantata+One' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" href="css/style.css"></link>
+    <link rel="icon" href="img/favicon.ico"></link>
+  </head>
+  <body>
+    <div id="paper">
+      <div id="title">
+        <h1>Network Flux</h1>
+        <div class="clearfix"></div>
+      </div>
+      <div id="signin">
+        <p>See how your network evolves over time.</p>
+        <script type="in/Login" data-size="large">
+        </script>
+      </div>
+      <div id="share">
+        <script type="IN/Share"></script>
+      </div>
+      <div id="viewport">
+        <div id="intro1" class="intro">
+          <h2>Hello, <span id="yourname"></span>.</h2>
+          <p>Your LinkedIn network is constantly changing. It moves, grows, and evolves, just as you do throughout your career. What shape does your professional network take?</p>
+        </div>
+        <div id="intro2" class="intro">
+          <p>Discover the reach of your network. To get started, try dragging the slider to a point in your timeline.</p>
+          <img src="img/arrow-drawn.gif">
+        </div>
+        <h2 id="companyTitle"></h2>
+        <div id="connections"></div>
+        <div id="date"></div>
+      </div>
+      <div id="slider">
+        <div id="sliderHandle"></div>
+      </div>
+    </div>
+    <script src="js/jquery-ui-1.8.20.custom/js/jquery-1.7.2.min.js"></script>
+    <script src="js/jquery-ui-1.8.20.custom/js/jquery-ui-1.8.20.custom.min.js"></script>
+    <!--
+    <script src="js/helpers.js"></script>
+    <script src="js/graph.js"></script>
+    <script src="js/flux.js"></script>
+    -->
+    <script src="js/assets.js"></script>
+    <script type="text/javascript" src="http://platform.linkedin.com/in.js">
+      api_key: 7v4r1chdr6ms
+      authorize: true
+      onLoad: onLinkedInLoad
+    </script>
+    <script type="text/javascript">
+
+      var _gaq = _gaq || [];
+      _gaq.push(['_setAccount', 'UA-30099514-1']);
+      _gaq.push(['_trackPageview']);
+
+      (function() {
+        var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+        ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+        var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+      })();
+
+    </script>
+  </body>
+</html>
